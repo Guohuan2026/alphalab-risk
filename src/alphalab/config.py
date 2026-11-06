@@ -13,6 +13,7 @@ import pandas as pd
 import yaml
 
 from alphalab.core.calendar import get_calendar
+from alphalab.portfolio.core import REBALANCE_RULES, validate_weights
 
 
 @dataclass
@@ -20,6 +21,20 @@ class ValidationConfig:
     extreme_return: float = 0.4
     max_gap_sessions: int = 5  # trading sessions on the exchange calendar
     vendor_adj_tolerance: float = 0.002
+
+
+@dataclass
+class PortfolioConfig:
+    """Fixed target weights; the risk study forecasts this portfolio's daily return."""
+
+    name: str
+    weights: dict[str, float]
+    rebalance: str = "monthly"  # "daily" (constant mix) or "monthly"
+
+    def __post_init__(self):
+        self.weights = validate_weights({k.strip().upper(): v for k, v in self.weights.items()})
+        if self.rebalance not in REBALANCE_RULES:
+            raise ValueError(f"portfolio.rebalance must be one of {REBALANCE_RULES}")
 
 
 @dataclass
@@ -33,6 +48,7 @@ class Config:
     calendar: str = "XNYS"  # exchange_calendars code, e.g. XNYS, XTSE, XLON
     provider_options: dict = field(default_factory=dict)
     validation: ValidationConfig = field(default_factory=ValidationConfig)
+    portfolio: PortfolioConfig | None = None
 
     def __post_init__(self):
         if not self.universe:
@@ -46,6 +62,10 @@ class Config:
         self.universe = [t.strip().upper() for t in self.universe]
         if len(set(self.universe)) != len(self.universe):
             raise ValueError("universe contains duplicate tickers")
+        if self.portfolio is not None:
+            outside = sorted(set(self.portfolio.weights) - set(self.universe))
+            if outside:
+                raise ValueError(f"portfolio assets not in universe: {outside}")
         try:
             get_calendar(self.calendar)
         except Exception as exc:  # exchange_calendars raises its own InvalidCalendarName
@@ -58,4 +78,6 @@ def load_config(path: str | Path) -> Config:
     if "max_gap_bdays" in val_raw:  # renamed in M2 when gaps moved to the exchange calendar
         raise ValueError("validation.max_gap_bdays was renamed to max_gap_sessions")
     val = ValidationConfig(**val_raw)
-    return Config(**raw, validation=val)
+    port_raw = raw.pop("portfolio", None)
+    port = PortfolioConfig(**port_raw) if port_raw else None
+    return Config(**raw, validation=val, portfolio=port)

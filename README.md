@@ -1,12 +1,27 @@
-# AlphaLab
+# AlphaLab-Risk
 
-An educational, production-style quantitative investment research platform in Python.
-Public data (Yahoo Finance) for the prototype; a provider interface designed so that
-WRDS/CRSP can be plugged in later without touching return or factor code.
+**Machine Learning for Portfolio Risk Forecasting and Stress Resilience**
 
-**Status: Milestone 2 in progress — exchange calendar done; point-in-time universe next.** No factors or backtests yet.
+> Can machine-learning models improve the accuracy and robustness of portfolio downside-risk
+> forecasts compared with traditional econometric methods, particularly during market stress?
 
-## What Milestone 1 gives you
+A reproducible research platform in Python. It compares historical simulation, EWMA,
+GARCH / GJR-GARCH and filtered HS with quantile-regression forests, gradient boosting and
+ML-volatility hybrids on 1-day VaR and Expected Shortfall. Every model is backtested
+out-of-sample (Kupiec, Christoffersen, DQ, ES tests, FZ0 loss, Diebold–Mariano, Model
+Confidence Set) with a focus on stress periods.
+
+- Research design, hypotheses and leakage safeguards: **[docs/RESEARCH_DESIGN.md](docs/RESEARCH_DESIGN.md)**
+- Plan: **[docs/ROADMAP.md](docs/ROADMAP.md)**
+
+**Status: Risk week 1 — data foundation (portfolio return series) in progress.** No risk
+models yet. The Python package and CLI are still called `alphalab`.
+
+*History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
+returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is
+preserved at git tag `v0.1-equity-research`.
+
+## Foundation reused from AlphaLab (M1–M2)
 
 | Component | File | What it does |
 |---|---|---|

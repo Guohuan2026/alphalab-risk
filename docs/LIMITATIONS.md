@@ -1,11 +1,15 @@
-# Known limitations (Milestones 1–2)
+# Known limitations
 
-Ordered roughly by how much they can distort research conclusions.
+Research-design limitations of the risk study (statistical power, univariate portfolio
+approach, tuning budget, ...) are listed in [RESEARCH_DESIGN.md §9](RESEARCH_DESIGN.md).
+This file lists limitations of the **code and data as built**, ordered roughly by how much
+they can distort conclusions.
 
-1. **Survivorship bias (severe).** The universe is a hand-picked list of companies that
-   exist and are large *today*. Yahoo has little data on delisted firms. Any backtest on
-   it overstates returns and understates risk. Fix: CRSP with point-in-time universe
-   membership and delisting returns (`DLRET`).
+1. **Survivorship bias.** Severe for the archived stock-selection universe
+   (`configs/yahoo_us_core.yaml`, a hand-picked list of today's large caps). Much smaller
+   for the risk study, which uses indices and ETFs that did not delist. It remains in the
+   sense that we study markets that *survived and grew* (US, Canada). A full fix for
+   stock-level work is CRSP with point-in-time membership and delisting returns (`DLRET`).
 2. **Unofficial data source.** `yfinance` scrapes an undocumented Yahoo endpoint. It can
    rate-limit, change format, or return errors without notice. Treat it as a teaching
    and prototyping source, never as ground truth.
@@ -35,3 +39,17 @@ Ordered roughly by how much they can distort research conclusions.
 10. **Live path depends on the network.** The Yahoo download path is covered by an
     offline normalisation test; the live test (`pytest -m network`) passed on the
     owner's Mac on 2026-11-06 but can break whenever Yahoo changes its API (see #2).
+11. **SPY vs S&P 500 TR index, before 2009 (open).** Our SPY total return tracks `^SP500TR`
+    to within 0.13%/yr over 1993–2026 (about the expense ratio), and daily correlation is
+    about 0.999 from 2009 on. But in 1993–2008 daily correlation is only 0.94–0.98, with up
+    to 59 days a year differing by more than 0.5%. Cause not yet established (closing-time
+    differences or stale index prints are candidates). Because daily risk forecasts are
+    sensitive to this, P1 models will also be run on `^SP500TR` as a robustness check.
+12. **XIU.TO year-end reinvested distributions (open, blocks P3).** Some December
+    "dividends" (e.g. $0.46 on 2000-12-27, 3.5% of price) come with no price drop. That is
+    typical of reinvested (non-cash) distributions with unit consolidation. Treating them
+    as cash creates fake gains (+3.8% that day). Must be resolved, for example by
+    cross-checking against Yahoo's adjusted close or iShares distribution records, before
+    P3 results are used. Related: Yahoo shows XIU trading on 2001-09-11 (a partial TSX
+    session before the halt), which `exchange_calendars` marks closed; the row is kept and
+    flagged as `non_session_date`.

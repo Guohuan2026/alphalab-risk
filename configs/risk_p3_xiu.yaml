@@ -1,0 +1,21 @@
+# AlphaLab-Risk P3: Canadian equity, iShares S&P/TSX 60 (XIU.TO), in CAD.
+# Uses the Toronto Stock Exchange calendar (XTSE): Canada Day, Victoria Day, etc.
+# Never mixed with USD assets (no FX handling; see docs/LIMITATIONS.md #6).
+provider: yahoo
+universe: [XIU.TO]
+start: "1999-10-01"
+end: "2026-10-30"
+data_dir: data
+monthly_min_obs: 15
+calendar: XTSE
+provider_options:
+  pause_seconds: 0.5
+  max_retries: 2
+validation:
+  extreme_return: 0.4
+  max_gap_sessions: 5
+  vendor_adj_tolerance: 0.002
+portfolio:
+  name: p3_xiu
+  weights: {XIU.TO: 1.0}
+  rebalance: daily

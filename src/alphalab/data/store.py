@@ -90,11 +90,23 @@ class RawSnapshotStore:
         d = self.root / provider
         return sorted(p.name for p in d.iterdir() if p.is_dir()) if d.exists() else []
 
-    def latest(self, provider: str) -> str:
+    def latest(self, provider: str, request: dict | None = None) -> str:
+        """Newest snapshot for ``provider``; with ``request``, the newest whose saved request
+        (tickers, start, end) equals it. Without the filter, several configs sharing one
+        provider (e.g. three Yahoo portfolios) would silently pick each other's data."""
         snaps = self.list(provider)
+        if request is not None:
+            snaps = [s for s in snaps if self._request(provider, s) == request]
         if not snaps:
-            raise FileNotFoundError(f"no snapshots for provider '{provider}' under {self.root}")
+            what = f" matching request {request}" if request is not None else ""
+            raise FileNotFoundError(
+                f"no snapshots for provider '{provider}'{what} under {self.root}; run ingest first"
+            )
         return snaps[-1]  # IDs start with a UTC timestamp, so lexical order == time order
+
+    def _request(self, provider: str, snapshot_id: str) -> dict | None:
+        manifest = json.loads((self.root / provider / snapshot_id / "manifest.json").read_text())
+        return manifest.get("request")
 
     def load(
         self, provider: str, snapshot_id: str, verify: bool = True

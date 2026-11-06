@@ -1,0 +1,23 @@
+# AlphaLab-Risk P2: global balanced "60/40" policy portfolio (pension-fund style template).
+# 60% equity (SPY US 40%, EFA developed ex-US 20%), 40% fixed income (IEF 7-10y Treasuries
+# 30%, LQD IG corporates 10%). All USD-listed ETFs on NYSE/NASDAQ. Monthly rebalance.
+# Bond ETFs start 2002-07-30, so the 1,000-session minimum window still leaves the GFC
+# out-of-sample.
+provider: yahoo
+universe: [SPY, EFA, IEF, LQD]
+start: "2002-07-01"
+end: "2026-10-30"
+data_dir: data
+monthly_min_obs: 15
+calendar: XNYS
+provider_options:
+  pause_seconds: 0.5
+  max_retries: 2
+validation:
+  extreme_return: 0.4
+  max_gap_sessions: 5
+  vendor_adj_tolerance: 0.002
+portfolio:
+  name: p2_balanced_60_40
+  weights: {SPY: 0.40, EFA: 0.20, IEF: 0.30, LQD: 0.10}
+  rebalance: monthly

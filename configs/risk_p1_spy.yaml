@@ -1,0 +1,22 @@
+# AlphaLab-Risk P1 (main study): US equity, SPY total return incl. dividends.
+# ^SP500TR (S&P 500 total-return index) is ingested alongside as an independent cross-check
+# of our own dividend-inclusive SPY returns; it is NOT part of the portfolio.
+# See docs/RESEARCH_DESIGN.md §3-4. OOS 1997-2022; lockbox 2023-01-01 .. 2026-10-30.
+provider: yahoo
+universe: [SPY, ^SP500TR]
+start: "1993-01-01"
+end: "2026-10-30"        # fixed past date for reproducibility (last session of Oct 2026)
+data_dir: data
+monthly_min_obs: 15
+calendar: XNYS
+provider_options:
+  pause_seconds: 0.5
+  max_retries: 2
+validation:
+  extreme_return: 0.4
+  max_gap_sessions: 5
+  vendor_adj_tolerance: 0.002
+portfolio:
+  name: p1_spy
+  weights: {SPY: 1.0}
+  rebalance: daily
