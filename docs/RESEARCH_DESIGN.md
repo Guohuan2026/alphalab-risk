@@ -98,7 +98,7 @@ Every model obeys the same contract. This is what makes the comparison fair.
 | Horizon | **h = 1 trading day** | h = 10 days, non-overlapping, descriptive only (too few exceedances to test) |
 | VaR levels | α = 1% (Basel), 5% (more exceedances, more power) | 2.5% |
 | ES level | α = 2.5% (FRTB 97.5%) | 1%, 5% |
-| Information set | data available at the close of t | — |
+| Information set | data published by the end of day t (after the close, before the t+1 open); FRED lagged one session | — |
 | Estimation window | **expanding**, minimum 1,000 sessions (~4 years) | rolling 1,000 sessions |
 | Refit frequency | parameters re-estimated every 21 sessions; filters (EWMA/GARCH variance, features) updated daily | refit every 5 sessions |
 | OOS period | P1: 1997-01 → 2022-12 | — |
@@ -159,7 +159,7 @@ little daily data for its parameter count, and it is hard to interpret for valid
 | Forecast engine peeks ahead | engine-level truncation test: the forecast for t+1 made on `data[:t]` must equal the one produced in the full run |
 | Training label overlaps forecast date | at origin t, training pairs are (x_s, r_{s+1}) with s+1 ≤ t; tuning validation set separated by an h-day embargo |
 | Scaling / imputation fitted on future data | scalers and imputers fitted inside each training window only |
-| Publication lag | FRED series shifted one session; VIX close is concurrent with the equity close (both known at t) |
+| Publication lag | FRED series shifted one session; VIX settles at 4:15 pm ET, after the 4:00 pm equity close but before the t+1 open, so it is in the end-of-day-t information set |
 | Hyperparameters tuned on the test set | tuning on the last 20% of each training window, re-done yearly, small pre-declared grids |
 | Researcher degrees of freedom | design frozen at tag `prereg-v1`; lockbox 2023–2026 opened once; all runs logged with snapshot hash and config |
 | Regime labels leak | stress dummies are used **only** to split the evaluation, never as model inputs |

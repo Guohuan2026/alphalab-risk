@@ -20,3 +20,8 @@ portfolio:
   name: p1_spy
   weights: {SPY: 1.0}
   rebalance: daily
+features:                # docs/METHODOLOGY.md §7; downloaded by `alphalab ingest`
+  yahoo_levels: ["^VIX"] # same-day (published at the close)
+  fred: [BAA10Y, T10Y3M] # credit and term spreads, lagged 1 session (published next morning)
+  fred_lag_sessions: 1
+  range_asset: SPY       # SPY high/low/open/close -> range-based variance

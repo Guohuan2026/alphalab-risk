@@ -53,3 +53,9 @@ they can distort conclusions.
     P3 results are used. Related: Yahoo shows XIU trading on 2001-09-11 (a partial TSX
     session before the halt), which `exchange_calendars` marks closed; the row is kept and
     flagged as `non_session_date`.
+13. **Feature timing and proxies.** FRED data are the *latest vintage*. That is harmless for
+    market yields, which are not revised, but not point-in-time for macro series (those
+    would need ALFRED vintages). VIX settles at 4:15 pm ET, after the equity close: fine
+    for an end-of-day forecast, not for one produced at 4:00 pm. Range-based variance
+    ignores the overnight gap, so it understates total variance. P3 (Canada) uses US
+    stress indicators (VIX, US spreads) as global proxies.

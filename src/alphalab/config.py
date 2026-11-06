@@ -38,6 +38,24 @@ class PortfolioConfig:
 
 
 @dataclass
+class FeaturesConfig:
+    """Inputs for risk features (see docs/METHODOLOGY.md §7)."""
+
+    yahoo_levels: list[str] = field(default_factory=lambda: ["^VIX"])  # same-day, log changes
+    fred: list[str] = field(default_factory=lambda: ["BAA10Y", "T10Y3M"])  # lagged, differences
+    fred_lag_sessions: int = 1  # FRED publishes the next morning
+    range_asset: str | None = None  # asset whose OHLC gives range-based variance
+
+    def __post_init__(self):
+        self.yahoo_levels = [s.strip().upper() for s in self.yahoo_levels]
+        self.fred = [s.strip().upper() for s in self.fred]
+        if self.range_asset is not None:
+            self.range_asset = self.range_asset.strip().upper()
+        if self.fred and self.fred_lag_sessions < 1:
+            raise ValueError("features.fred_lag_sessions must be >= 1 (FRED publishes next day)")
+
+
+@dataclass
 class Config:
     provider: str
     universe: list[str]
@@ -49,6 +67,7 @@ class Config:
     provider_options: dict = field(default_factory=dict)
     validation: ValidationConfig = field(default_factory=ValidationConfig)
     portfolio: PortfolioConfig | None = None
+    features: FeaturesConfig | None = None
 
     def __post_init__(self):
         if not self.universe:
@@ -66,6 +85,12 @@ class Config:
             outside = sorted(set(self.portfolio.weights) - set(self.universe))
             if outside:
                 raise ValueError(f"portfolio assets not in universe: {outside}")
+        if self.features is not None:
+            if self.portfolio is None:
+                raise ValueError("features need a portfolio (they describe its return series)")
+            ra = self.features.range_asset
+            if ra is not None and ra not in self.universe:
+                raise ValueError(f"features.range_asset {ra!r} not in universe")
         try:
             get_calendar(self.calendar)
         except Exception as exc:  # exchange_calendars raises its own InvalidCalendarName
@@ -80,4 +105,6 @@ def load_config(path: str | Path) -> Config:
     val = ValidationConfig(**val_raw)
     port_raw = raw.pop("portfolio", None)
     port = PortfolioConfig(**port_raw) if port_raw else None
-    return Config(**raw, validation=val, portfolio=port)
+    feat_raw = raw.pop("features", None)
+    feat = FeaturesConfig(**feat_raw) if feat_raw is not None else None
+    return Config(**raw, validation=val, portfolio=port, features=feat)

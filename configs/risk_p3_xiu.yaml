@@ -19,3 +19,10 @@ portfolio:
   name: p3_xiu
   weights: {XIU.TO: 1.0}
   rebalance: daily
+features:
+  # US stress indicators used as global proxies (open question: Canadian alternatives such
+  # as a TSX volatility index or CAD credit spreads; see RESEARCH_DESIGN.md §5).
+  yahoo_levels: ["^VIX"]
+  fred: [BAA10Y, T10Y3M]
+  fred_lag_sessions: 1
+  range_asset: XIU.TO

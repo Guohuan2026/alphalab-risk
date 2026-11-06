@@ -21,3 +21,8 @@ portfolio:
   name: p2_balanced_60_40
   weights: {SPY: 0.40, EFA: 0.20, IEF: 0.30, LQD: 0.10}
   rebalance: monthly
+features:
+  yahoo_levels: ["^VIX"]
+  fred: [BAA10Y, T10Y3M]
+  fred_lag_sessions: 1
+  range_asset: SPY       # equity sleeve's range as a stress proxy (no OHLC for a portfolio)

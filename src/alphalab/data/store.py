@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import platform
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +25,8 @@ import pandas as pd
 
 import alphalab
 from alphalab.data.schema import KEY, check_schema
+
+DATA_FILE = "prices.parquet"  # kept for every snapshot kind so old snapshots stay readable
 
 
 def content_hash(df: pd.DataFrame) -> str:
@@ -51,8 +54,11 @@ class RawSnapshotStore:
         provider_meta: dict,
         request: dict,
         now: datetime | None = None,
+        validate: Callable[[pd.DataFrame], None] = check_schema,
     ) -> SnapshotInfo:
-        check_schema(df)
+        """Save once, never overwrite. ``validate`` is the schema check (prices by default;
+        ``check_series_schema`` for feature series)."""
+        validate(df)
         now = now or datetime.now(UTC)
         digest = content_hash(df)
         provider = provider_meta["provider"]
@@ -82,7 +88,7 @@ class RawSnapshotStore:
                 "platform": platform.platform(),
             },
         }
-        df.to_parquet(path / "prices.parquet", index=False)
+        df.to_parquet(path / DATA_FILE, index=False)
         (path / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
         return SnapshotInfo(provider, snapshot_id, path, manifest)
 
@@ -113,7 +119,7 @@ class RawSnapshotStore:
     ) -> tuple[pd.DataFrame, dict]:
         path = self.root / provider / snapshot_id
         manifest = json.loads((path / "manifest.json").read_text())
-        df = pd.read_parquet(path / "prices.parquet")
+        df = pd.read_parquet(path / DATA_FILE)
         if verify and content_hash(df) != manifest["content_sha256"]:
             raise ValueError(f"content hash mismatch for {path}: file was modified")
         return df, manifest

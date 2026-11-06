@@ -8,7 +8,7 @@ import sys
 
 from alphalab.config import load_config
 from alphalab.data.store import RawSnapshotStore
-from alphalab.pipeline import ValidationFailed, run_build, run_ingest
+from alphalab.pipeline import ValidationFailed, run_build, run_ingest, run_ingest_features
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -17,7 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="command", required=True)
 
     for name, help_ in [
-        ("ingest", "download prices and save an immutable raw snapshot"),
+        ("ingest", "download prices (and feature series) into immutable raw snapshots"),
         ("build", "validate a snapshot and build return datasets"),
         ("snapshots", "list saved snapshots for the configured provider"),
     ]:
@@ -37,6 +37,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "ingest":
         info = run_ingest(cfg)
         print(f"snapshot: {info.snapshot_id}\npath:     {info.path}")
+        if cfg.features is not None:
+            finfo = run_ingest_features(cfg)
+            print(f"features: {finfo.snapshot_id}\npath:     {finfo.path}")
     elif args.command == "build":
         try:
             out = run_build(cfg, args.snapshot, force=args.force)

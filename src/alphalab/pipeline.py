@@ -13,11 +13,17 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pandas as pd
+
 import alphalab
 from alphalab.config import Config
 from alphalab.data.providers import get_provider
+from alphalab.data.providers.fred import FredSource
+from alphalab.data.providers.yahoo import YahooProvider
+from alphalab.data.schema import check_series_schema
 from alphalab.data.store import RawSnapshotStore, SnapshotInfo
 from alphalab.data.validation import validate_prices
+from alphalab.features import assemble_inputs, build_features, series_name
 from alphalab.portfolio import portfolio_returns
 from alphalab.returns.core import (
     compound_returns,
@@ -36,6 +42,38 @@ class ValidationFailed(RuntimeError):
 def snapshot_request(cfg: Config) -> dict:
     """What was asked of the provider; stored in each snapshot and used to find it again."""
     return {"tickers": cfg.universe, "start": cfg.start, "end": cfg.end}
+
+
+def features_request(cfg: Config) -> dict:
+    f = cfg.features
+    return {"yahoo_levels": f.yahoo_levels, "fred": f.fred, "start": cfg.start, "end": cfg.end}
+
+
+def run_ingest_features(cfg: Config) -> SnapshotInfo:
+    """Download feature series (VIX from Yahoo, spreads from FRED) into ONE immutable
+    snapshot under data/raw/features/, in the long series format."""
+    f = cfg.features
+    parts, sources = [], {}
+    if f.yahoo_levels:
+        yahoo = YahooProvider(**(cfg.provider_options if cfg.provider == "yahoo" else {}))
+        px = yahoo.fetch(f.yahoo_levels, cfg.start, cfg.end)
+        missing = set(f.yahoo_levels) - (set(px["security_id"]) if len(px) else set())
+        if missing:
+            raise RuntimeError(f"yahoo returned no data for {sorted(missing)}; nothing saved")
+        parts.append(px[["date", "security_id", "close"]].rename(columns={"close": "value"}))
+        sources["yahoo"] = yahoo.metadata()
+    if f.fred:
+        fred = FredSource()
+        parts.append(fred.fetch(f.fred, cfg.start, cfg.end))
+        sources["fred"] = fred.metadata()
+    df = pd.concat(parts, ignore_index=True)
+    df["security_id"] = df["security_id"].astype("string")
+    df = df.sort_values(["security_id", "date"], kind="mergesort").reset_index(drop=True)
+    meta = {"provider": "features", "price_basis": "n/a (levels)", "sources": sources}
+    store = RawSnapshotStore(cfg.data_dir)
+    info = store.save(df, meta, features_request(cfg), validate=check_series_schema)
+    log.info("saved feature snapshot %s (%d rows)", info.snapshot_id, len(df))
+    return info
 
 
 def run_ingest(cfg: Config) -> SnapshotInfo:
@@ -93,6 +131,9 @@ def run_build(cfg: Config, snapshot_id: str = "latest", force: bool = False) -> 
         log.info(
             "portfolio %s: %d days from %s", cfg.portfolio.name, len(port), port_info["first_date"]
         )
+    feat_info = None
+    if cfg.features is not None:  # config guarantees a portfolio exists
+        feat_info = _build_features(cfg, store, prices, port["ret"], out)
     report.to_frame().to_csv(out / "validation_report.csv", index=False)
     (out / "build_manifest.json").write_text(
         json.dumps(
@@ -108,6 +149,7 @@ def run_build(cfg: Config, snapshot_id: str = "latest", force: bool = False) -> 
                 "monthly_min_obs": cfg.monthly_min_obs,
                 "calendar": cfg.calendar,
                 "portfolio": port_info,
+                "features": feat_info,
                 "outputs": sorted(p.name for p in out.iterdir()),
             },
             indent=2,
@@ -115,3 +157,34 @@ def run_build(cfg: Config, snapshot_id: str = "latest", force: bool = False) -> 
     )
     log.info("wrote %s", out)
     return out
+
+
+def _build_features(cfg: Config, store: RawSnapshotStore, prices, port_ret, out: Path) -> dict:
+    f = cfg.features
+    fsnap = store.latest("features", features_request(cfg))
+    series, fman = store.load("features", fsnap)
+    ohlc = None
+    if f.range_asset is not None:
+        a = prices[prices["security_id"] == f.range_asset].set_index("date")
+        ohlc = a[["open", "high", "low", "close"]]
+    inputs = assemble_inputs(
+        port_ret, series, f.yahoo_levels, f.fred, f.fred_lag_sessions, ohlc, cfg.calendar
+    )
+    feats = build_features(
+        inputs,
+        log_change_levels=[series_name(s) for s in f.yahoo_levels],
+        diff_levels=[series_name(s) for s in f.fred],
+    )
+    feats.to_parquet(out / "features_daily.parquet")
+    complete = feats.dropna()
+    first = str(complete.index[0].date()) if len(complete) else None
+    log.info("features: %d columns, complete rows from %s", feats.shape[1], first)
+    return {
+        **asdict(f),
+        "snapshot": fsnap,
+        "snapshot_sha256": fman["content_sha256"],
+        "columns": list(feats.columns),
+        "first_complete_date": first,
+        "n_complete_rows": len(complete),
+        "nan_share_by_column": feats.isna().mean().round(4).to_dict(),
+    }

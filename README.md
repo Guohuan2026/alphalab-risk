@@ -14,8 +14,8 @@ Confidence Set) with a focus on stress periods.
 - Research design, hypotheses and leakage safeguards: **[docs/RESEARCH_DESIGN.md](docs/RESEARCH_DESIGN.md)**
 - Plan: **[docs/ROADMAP.md](docs/ROADMAP.md)**
 
-**Status: Risk week 1 — data foundation (portfolio return series) in progress.** No risk
-models yet. The Python package and CLI are still called `alphalab`.
+**Status: Risk week 1 — portfolio series, features and simulated ground truth done; forecast
+engine and first baselines next.** No risk models yet. The Python package and CLI are still called `alphalab`.
 
 *History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
 returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is

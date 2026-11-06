@@ -11,9 +11,9 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 - NYSE/TSX exchange calendars.
 
 ## Week 1 — Data foundation and first baselines
-1. **Portfolio return series** (`portfolio/`): fixed weights, daily or monthly rebalancing,
+1. ✅ **Portfolio return series** (`portfolio/`): fixed weights, daily or monthly rebalancing,
    PIT-tested; configs for P1 (SPY), P2 (60/40 balanced), P3 (XIU.TO).
-2. **Features** (`features/`, `providers/fred.py`): HAR realized variance, range-based
+2. ✅ **Features** (`features/`, `providers/fred.py`): HAR realized variance, range-based
    variance, VIX, credit and term spreads (FRED, lagged one session); every feature PIT-tested.
    Synthetic GARCH-t generator with known true VaR/ES for model tests.
 3. **Risk-model interface + forecast engine** (`risk/`): expanding/rolling windows, refit

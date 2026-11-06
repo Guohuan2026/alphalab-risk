@@ -103,3 +103,49 @@ Why this is not look-ahead: a calendar records when the market was *open*, not p
 Scheduled holidays are published years ahead. Unscheduled closures are only known
 afterwards, but they can only change bookkeeping (a gap count, whether a month is
 finished), never a signal value.
+
+## 7. Risk features (AlphaLab-Risk)
+
+**Information set.** A feature stamped at session *t* may use anything *published by the end
+of day t*: after the close, before the next open. The risk forecast it feeds is for the loss
+on *t+1*. The label `next_day_loss` (L_{t+1} = −r_{t+1}) lives in `features/targets.py`. It
+deliberately fails the truncation test, and a test checks that it does.
+
+| Family | Columns | Formula / rule | Why |
+|---|---|---|---|
+| Returns | `ret`, `abs_ret`, `rv_1` | r_t, \|r_t\|, r_t² | Most recent shock |
+| HAR realized variance | `rv_5`, `rv_22`, `rv_66` | mean of r² over 5/22/66 sessions (full window required) | Volatility is persistent at week/month/quarter horizons (Corsi 2009) |
+| Range variance | `pk_1`, `gk_1`, `gk_5`, `gk_22` | Parkinson (ln H/L)²/(4 ln 2); Garman–Klass ½(ln H/L)² − (2 ln 2 − 1)(ln C/O)² | The intraday range is a more efficient variance proxy than r²; split-adjusted OHLC ratios are unaffected by splits |
+| Drawdown | `dd_252` | wealth / trailing-252 max − 1, with wealth = Π(1 + r) built forward | Stress state; never uses vendor backward-adjusted levels |
+| VIX | `vix`, `vix_chg_5` | same-day close; 5-session log change | Option-implied (forward-looking) volatility |
+| Credit / term spreads | `baa10y`, `t10y3m`, `*_chg_22` | FRED, **lagged 1 session**; 22-session difference (spreads can be negative, so no logs) | Funding and recession stress |
+
+**Alignment (`align_asof`).** Series dated on their own calendars (FRED observes on
+bond-market days, VIX on CBOE days) are put onto the portfolio's trading sessions by an
+*as-of* join. The value at session *t* is the latest observation dated on or before the
+session `lag` trading days earlier. Example: a FRED value observed Thursday is published
+Friday morning and so is first used on Friday; with Friday a holiday (Good Friday), it is
+first used the following Monday. A value more than 5 sessions old becomes NaN, so a
+discontinued series cannot pose as a calm market.
+
+**Snapshots.** Feature series are stored like prices (immutable, hashed), in a long
+`date, security_id, value` format under `data/raw/features/`. Every build records which
+feature snapshot it used.
+
+## 8. Simulated ground truth (GJR-GARCH-t)
+
+`risk/simulate.py` generates returns from a GJR-GARCH(1,1) with unit-variance Student-t
+innovations. Because σ_t is known at t−1, the *true* VaR and ES of each day are known in
+closed form:
+
+```
+VaR_a,t = −μ + σ_t · q_a,   q_a = −c·t_a
+ES_a,t  = −μ + σ_t · s_a,   s_a =  c · f_ν(t_a)/a · (ν + t_a²)/(ν − 1),   c = √((ν−2)/ν)
+```
+
+The formulas are checked against 4 million Monte Carlo draws, and the simulated true VaR
+has the right exceedance rate. Later, every risk model is first tested on this data. A
+correct GARCH should recover σ_t; coverage tests should accept the true VaR and reject a
+slow model during simulated volatility bursts. A useful fact for interviews: under a normal
+distribution ES/VaR at 1% is 1.15, but with ν = 6 it exceeds 1.2. So a model that is
+calibrated for VaR under normality still understates ES when tails are fat.
