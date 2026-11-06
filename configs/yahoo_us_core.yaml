@@ -1,0 +1,18 @@
+# Live public data from Yahoo Finance (unofficial API).
+# Universe chosen to exercise corporate actions:
+#   AAPL 4:1 split (2020-08-31), NVDA 4:1 (2021) and 10:1 (2024) splits,
+#   KO / XOM / JPM regular dividends, SPY as a market proxy (ETF distributions).
+# NOTE: this is a hand-picked list of TODAY's large caps => survivorship-biased.
+provider: yahoo
+universe: [SPY, AAPL, MSFT, NVDA, JPM, XOM, KO]
+start: "2015-01-01"
+end: "2026-10-30"        # fixed past date (last trading day of Oct 2026) for reproducibility
+data_dir: data
+monthly_min_obs: 15
+provider_options:
+  pause_seconds: 0.5
+  max_retries: 2
+validation:
+  extreme_return: 0.4   # a mishandled 2:1 split is ~-50%; must be caught
+  max_gap_bdays: 5
+  vendor_adj_tolerance: 0.002

@@ -1,0 +1,9 @@
+# Offline, deterministic data for development and CI. Not market data.
+provider: synthetic
+universe: [AAA, BBB, CCC, DDD]
+start: "2018-01-01"
+end: "2024-12-31"
+data_dir: data
+monthly_min_obs: 15
+provider_options:
+  seed: 42

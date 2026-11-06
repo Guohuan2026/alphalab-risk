@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Data: never commit downloaded or derived data (size, licensing - CRSP is licensed!)
+data/raw/
+data/processed/
+
+# OS / editors
+.DS_Store
+.idea/
+
+# Run logs
+logs/
