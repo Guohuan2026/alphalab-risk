@@ -12,11 +12,13 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from alphalab.core.calendar import get_calendar
+
 
 @dataclass
 class ValidationConfig:
     extreme_return: float = 0.4
-    max_gap_bdays: int = 5
+    max_gap_sessions: int = 5  # trading sessions on the exchange calendar
     vendor_adj_tolerance: float = 0.002
 
 
@@ -28,6 +30,7 @@ class Config:
     end: str
     data_dir: Path = Path("data")
     monthly_min_obs: int = 15
+    calendar: str = "XNYS"  # exchange_calendars code, e.g. XNYS, XTSE, XLON
     provider_options: dict = field(default_factory=dict)
     validation: ValidationConfig = field(default_factory=ValidationConfig)
 
@@ -43,9 +46,16 @@ class Config:
         self.universe = [t.strip().upper() for t in self.universe]
         if len(set(self.universe)) != len(self.universe):
             raise ValueError("universe contains duplicate tickers")
+        try:
+            get_calendar(self.calendar)
+        except Exception as exc:  # exchange_calendars raises its own InvalidCalendarName
+            raise ValueError(f"unknown exchange calendar {self.calendar!r}") from exc
 
 
 def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text())
-    val = ValidationConfig(**(raw.pop("validation", None) or {}))
+    val_raw = raw.pop("validation", None) or {}
+    if "max_gap_bdays" in val_raw:  # renamed in M2 when gaps moved to the exchange calendar
+        raise ValueError("validation.max_gap_bdays was renamed to max_gap_sessions")
+    val = ValidationConfig(**val_raw)
     return Config(**raw, validation=val)

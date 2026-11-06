@@ -34,6 +34,7 @@ def test_cli_runs(config_yaml, capsys):
         ({"end": "2999-01-01"}, "past"),
         ({"start": "2021-01-01", "end": "2020-01-01"}, "before"),
         ({"universe": ["A", "a"]}, "duplicate"),
+        ({"calendar": "NOPE"}, "unknown exchange calendar"),
     ],
 )
 def test_config_guards(kwargs, msg):

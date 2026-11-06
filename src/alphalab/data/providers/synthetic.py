@@ -13,6 +13,7 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
+from alphalab.core.calendar import DEFAULT_CALENDAR, trading_sessions
 from alphalab.data.providers.base import DataProvider
 from alphalab.data.schema import PriceBasis, coerce_schema, empty_frame
 
@@ -28,12 +29,14 @@ class SyntheticProvider(DataProvider):
         annual_vol: float = 0.25,
         dividend_yield_per_payment: float = 0.005,
         dividend_every_n_days: int = 63,
+        calendar: str = DEFAULT_CALENDAR,
     ):
         self.seed = seed
         self.annual_drift = annual_drift
         self.annual_vol = annual_vol
         self.div_yield = dividend_yield_per_payment
         self.div_every = dividend_every_n_days
+        self.calendar = calendar
 
     def _one(self, ticker: str, dates: pd.DatetimeIndex, with_split: bool) -> pd.DataFrame:
         # Seed from (global seed, ticker) so each ticker is stable and independent.
@@ -79,11 +82,16 @@ class SyntheticProvider(DataProvider):
         )
 
     def fetch(self, tickers: Sequence[str], start: str, end: str) -> pd.DataFrame:
-        dates = pd.bdate_range(start, end)  # Mon-Fri; ignores exchange holidays
+        dates = trading_sessions(start, end, self.calendar)  # real exchange days, no holidays
         if len(dates) < 2 or not tickers:
             return empty_frame()
         frames = [self._one(t, dates, with_split=(i == 0)) for i, t in enumerate(tickers)]
         return coerce_schema(pd.concat(frames, ignore_index=True))
 
     def metadata(self) -> dict:
-        return {**super().metadata(), "seed": self.seed, "note": "synthetic, not market data"}
+        return {
+            **super().metadata(),
+            "seed": self.seed,
+            "calendar": self.calendar,
+            "note": "synthetic, not market data",
+        }

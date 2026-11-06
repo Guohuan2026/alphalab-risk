@@ -4,7 +4,7 @@ An educational, production-style quantitative investment research platform in Py
 Public data (Yahoo Finance) for the prototype; a provider interface designed so that
 WRDS/CRSP can be plugged in later without touching return or factor code.
 
-**Status: Week 1 / Milestone 1 — data pipeline and returns.** No factors or backtests yet.
+**Status: Milestone 2 in progress — exchange calendar done; point-in-time universe next.** No factors or backtests yet.
 
 ## What Milestone 1 gives you
 
@@ -16,11 +16,14 @@ WRDS/CRSP can be plugged in later without touching return or factor code.
 | Validation | `src/alphalab/data/validation.py` | Errors block the build; warnings flag splits, gaps, vendor mismatches |
 | Returns | `src/alphalab/returns/core.py` | Total/price returns from raw corporate actions, forward-built TRI, monthly compounding, forward/trailing returns |
 | Look-ahead check | `src/alphalab/core/lookahead.py` | Truncation test: `f(data[:d])[d] == f(data)[d]` |
+| Trading calendar (M2) | `src/alphalab/core/calendar.py` | NYSE sessions via `exchange_calendars`: gap checks, month completeness, synthetic dates |
 | CLI | `src/alphalab/cli.py` | `alphalab ingest | build | snapshots --config …` |
 
 ## Quick start (macOS)
 
-Full, explained walkthrough: **[docs/SETUP_MACOS.md](docs/SETUP_MACOS.md)**.
+Fastest: `bash scripts/setup_mac.sh` installs everything with `uv` and runs all checks
+(log in `logs/setup_mac.log`). Full, explained manual walkthrough:
+**[docs/SETUP_MACOS.md](docs/SETUP_MACOS.md)**.
 
 ```bash
 cd ~/Projects/alphalab

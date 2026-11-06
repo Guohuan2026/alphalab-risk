@@ -59,7 +59,7 @@ def run_build(cfg: Config, snapshot_id: str = "latest", force: bool = False) -> 
     prices, manifest = store.load(cfg.provider, snapshot_id)
     basis = manifest["provider"]["price_basis"]
 
-    report = validate_prices(prices, basis, **asdict(cfg.validation))
+    report = validate_prices(prices, basis, calendar=cfg.calendar, **asdict(cfg.validation))
     log.info(report.summary())
     if not report.ok and not force:
         raise ValidationFailed(f"{len(report.errors)} validation error(s); use --force to override")
@@ -69,7 +69,7 @@ def run_build(cfg: Config, snapshot_id: str = "latest", force: bool = False) -> 
 
     daily_long = compute_daily_returns(prices, basis)
     daily_wide = to_wide(daily_long, "ret")
-    monthly = compound_returns(daily_wide, "ME", min_obs=cfg.monthly_min_obs)
+    monthly = compound_returns(daily_wide, "ME", min_obs=cfg.monthly_min_obs, calendar=cfg.calendar)
 
     daily_long.to_parquet(out / "returns_daily_long.parquet", index=False)
     daily_wide.to_parquet(out / "returns_daily.parquet")
@@ -88,6 +88,7 @@ def run_build(cfg: Config, snapshot_id: str = "latest", force: bool = False) -> 
                 "validation_warnings": len(report.warnings),
                 "forced": force,
                 "monthly_min_obs": cfg.monthly_min_obs,
+                "calendar": cfg.calendar,
                 "outputs": sorted(p.name for p in out.iterdir()),
             },
             indent=2,

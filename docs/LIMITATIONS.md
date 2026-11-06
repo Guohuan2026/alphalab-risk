@@ -1,4 +1,4 @@
-# Known limitations (Milestone 1)
+# Known limitations (Milestones 1–2)
 
 Ordered roughly by how much they can distort research conclusions.
 
@@ -19,14 +19,19 @@ Ordered roughly by how much they can distort research conclusions.
    strategy P&L.
 6. **Currency.** No FX handling. Mixing USD and CAD listings (e.g. `RY.TO`) would mix
    currencies. Keep a single-currency universe until FX conversion is added.
-7. **Calendar.** The synthetic provider uses Mon–Fri business days (no holidays).
-   `drop_incomplete_last` uses business days too, so if a month's last business day is
-   an exchange holiday (e.g. Good Friday 2018-03-30) and the data end the day before,
-   that month is wrongly dropped. An exchange calendar is planned.
+7. **One calendar per run.** Gap checks, month completeness and synthetic dates use a
+   single exchange calendar (`calendar:` in the config, default NYSE `XNYS`). A universe
+   mixing exchanges with different holidays (e.g. NYSE + Toronto) will see false gaps or
+   `non_session_date` warnings for the other exchange. The calendar also includes
+   unscheduled closures (Hurricane Sandy 2012-10-29, 2025-01-09) that were only known
+   in hindsight; this affects bookkeeping only, never signal values. It covers
+   1925-01-01 to about one year ahead; dates outside that range are not supported.
+   *(M1's Mon–Fri calendar, which wrongly dropped months ending on Good Friday, was
+   replaced in M2.)*
 8. **Dividends only as cash on ex-date.** Special dividends, return of capital, spin-offs
    and rights issues are not modelled separately. Spin-offs in particular can appear as
    large negative price-only days.
 9. **No intraday or point-in-time fundamentals** yet; earnings/book data come later.
-10. **Live path verified offline only by the author's sandbox.** The Yahoo download path
-    is covered by an offline normalisation test; the live network test must be run on
-    your machine (`pytest -m network`).
+10. **Live path depends on the network.** The Yahoo download path is covered by an
+    offline normalisation test; the live test (`pytest -m network`) passed on the
+    owner's Mac on 2026-11-06 but can break whenever Yahoo changes its API (see #2).

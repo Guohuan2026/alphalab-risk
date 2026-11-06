@@ -20,6 +20,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from alphalab.core.calendar import DEFAULT_CALENDAR, last_session_on_or_before
 from alphalab.data.schema import KEY, PriceBasis
 
 
@@ -80,6 +81,7 @@ def compound_returns(
     freq: str = "ME",
     min_obs: int = 1,
     drop_incomplete_last: bool = True,
+    calendar: str | None = DEFAULT_CALENDAR,
 ) -> pd.DataFrame:
     """Compound daily returns into periods (``"ME"`` month-end, ``"W-FRI"`` weekly).
 
@@ -87,8 +89,10 @@ def compound_returns(
     - Missing days inside a period are skipped (implicitly 0% return); validation
       flags the gaps.
     - ``drop_incomplete_last`` removes the final period if the data stop before that
-      period's last business day (e.g. a month that is still in progress). Exchange
-      holidays on the last business day can cause a false positive; see LIMITATIONS.
+      period's last trading session on ``calendar`` (e.g. a month still in progress).
+      Using the exchange calendar means a month whose last weekday is a holiday
+      (Good Friday 2018-03-30) is correctly treated as complete. ``calendar=None``
+      falls back to Mon-Fri business days, for data with no exchange calendar.
     """
     log_r = np.log1p(ret_wide)
     out = np.expm1(log_r.resample(freq).sum(min_count=1))
@@ -96,8 +100,11 @@ def compound_returns(
     out = out.where(counts >= min_obs)
     if drop_incomplete_last and len(out):
         last_label = out.index[-1]
-        last_bday = pd.offsets.BDay().rollback(last_label)
-        if ret_wide.index.max() < last_bday:
+        if calendar is None:
+            last_day = pd.offsets.BDay().rollback(last_label)
+        else:
+            last_day = last_session_on_or_before(last_label, calendar)
+        if ret_wide.index.max() < last_day:
             out = out.iloc[:-1]
     return out
 

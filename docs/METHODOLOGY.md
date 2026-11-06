@@ -81,4 +81,25 @@ point-in-time datasets provide.
 - Month label = calendar month-end (`"ME"`).
 - `min_obs` (default 15) blanks months with too few trading days (e.g. listing month).
 - Missing days inside a month are skipped, i.e. treated as 0% — validation warns about
-  gaps larger than 5 business days so you can investigate.
+  gaps larger than `max_gap_sessions` (default 5) trading sessions so you can investigate.
+- A month is "complete" if the data reach its last **trading session**, not its last
+  weekday. March 2018 ended on Good Friday (closed), so data ending Thu 29 March is a
+  complete month.
+
+## 6. Trading calendar
+
+"Business day" (Mon–Fri) and "trading day" differ on roughly 9 NYSE holidays a year,
+plus rare unscheduled closures. AlphaLab uses `exchange_calendars` (config key
+`calendar`, default `XNYS`) wherever it needs to count or enumerate days:
+
+| Where | What changes |
+|---|---|
+| `validate_prices` — `date_gap` | gap = sessions between observations; Thanksgiving week is not "missing data" |
+| `validate_prices` — `non_session_date` | warns on a price row dated on a closed day (vendor glitch, timezone shift) |
+| `compound_returns(drop_incomplete_last=True)` | compares data end with the period's last session |
+| `SyntheticProvider` | generates prices only on sessions, so offline data looks like real data |
+
+Why this is not look-ahead: a calendar records when the market was *open*, not prices.
+Scheduled holidays are published years ahead. Unscheduled closures are only known
+afterwards, but they can only change bookkeeping (a gap count, whether a month is
+finished), never a signal value.

@@ -9,10 +9,11 @@ start: "2015-01-01"
 end: "2026-10-30"        # fixed past date (last trading day of Oct 2026) for reproducibility
 data_dir: data
 monthly_min_obs: 15
+calendar: XNYS          # NYSE trading days (holidays excluded)
 provider_options:
   pause_seconds: 0.5
   max_retries: 2
 validation:
   extreme_return: 0.4   # a mishandled 2:1 split is ~-50%; must be caught
-  max_gap_bdays: 5
+  max_gap_sessions: 5   # missing-data gap, in NYSE trading sessions
   vendor_adj_tolerance: 0.002

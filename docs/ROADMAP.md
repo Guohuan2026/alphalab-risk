@@ -3,9 +3,9 @@
 Each milestone ends with passing tests and a short write-up of what you learned.
 
 ## Week 1
-- **M1 — Data pipeline & returns (this milestone).** Schema, providers, snapshots,
+- **M1 — Data pipeline & returns (done).** Schema, providers, snapshots,
   validation, returns, truncation test, CLI.
-- **M2 — Universe & calendar.** Exchange calendar (`exchange_calendars`), point-in-time
+- **M2 — Universe & calendar.** ~~Exchange calendar (`exchange_calendars`)~~ (done), point-in-time
   universe object (membership by date), liquidity filters, a broader universe
   (e.g. S&P 500 constituents with an explicit survivorship warning).
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from alphalab.core.calendar import DEFAULT_CALENDAR, is_session, sessions_between
 from alphalab.data.schema import KEY, PriceBasis, SchemaError, check_schema
 from alphalab.returns.core import compute_daily_returns
 
@@ -65,8 +66,9 @@ def validate_prices(
     df: pd.DataFrame,
     price_basis: PriceBasis | str,
     extreme_return: float = 0.4,
-    max_gap_bdays: int = 5,
+    max_gap_sessions: int = 5,
     vendor_adj_tolerance: float = 0.002,
+    calendar: str = DEFAULT_CALENDAR,
 ) -> ValidationReport:
     rep = ValidationReport()
     try:
@@ -132,17 +134,29 @@ def validate_prices(
         lambda r: f"ret={r['ret']:.2%} (check split/dividend handling or bad tick)",
     )
 
-    # Calendar gaps: count business days between consecutive observations.
+    # Rows dated on a day the exchange was closed (holiday/weekend): usually a vendor
+    # glitch or a timezone shift. Warning, because returns are still computable.
+    _rows(
+        rep,
+        pd.Series(~is_session(df["date"], calendar), index=df.index),
+        df,
+        "warning",
+        "non_session_date",
+        lambda r: f"{r['date'].date()} is not a {calendar} trading session",
+    )
+
+    # Calendar gaps: count exchange sessions between consecutive observations, so
+    # holidays (Thanksgiving, Christmas) do not count as missing data.
     for sid, g in df.groupby("security_id", sort=False):
-        d = g["date"].to_numpy(dtype="datetime64[D]")
+        d = g["date"].sort_values().to_numpy()
         if len(d) < 2:
             continue
-        gaps = np.busday_count(d[:-1], d[1:])
-        for i in np.flatnonzero(gaps > max_gap_bdays):
+        gaps = sessions_between(d[:-1], d[1:], calendar)
+        for i in np.flatnonzero(gaps > max_gap_sessions):
             rep.add(
                 "warning",
                 "date_gap",
-                f"{gaps[i]} business days since {d[i]}",
+                f"{gaps[i]} {calendar} sessions since {pd.Timestamp(d[i]).date()}",
                 sid,
                 pd.Timestamp(d[i + 1]),
             )
