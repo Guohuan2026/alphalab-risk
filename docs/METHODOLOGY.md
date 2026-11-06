@@ -191,3 +191,33 @@ How the tests themselves were validated:
 What these tests cannot do: they say whether a model is *acceptable*, not which model is
 *better*. That needs loss functions (tick loss, FZ0) with Diebold–Mariano tests and a
 Model Confidence Set (week 2). They also ignore ES; ES backtests follow in week 2.
+
+## 10. GARCH-family models
+
+`risk/models/garch.py`; config types `garch`, `gjr`, `fhs`.
+
+```
+r_t = μ + σ_t z_t,  z_t ~ unit-variance t(ν)
+σ²_t = ω + (α + γ·1[ε_{t−1}<0]) ε²_{t−1} + β σ²_{t−1}        (γ = 0: plain GARCH)
+```
+
+- **Estimation:** maximum likelihood with `arch` on percent returns, converted to decimals.
+  Monthly refits, warm-started from the previous estimates.
+- **Daily filter:** the same function that generates the simulated truth
+  (`gjr_variance_filter`), so the timing is identical. It is updated one step per day
+  between refits, and a test checks this equals a full recompute.
+- **Tails:** GARCH-t and GJR-t use Student-t quantiles. **FHS** multiplies σ_{t+1} by the
+  empirical VaR/ES of the standardised residuals ẑ = (r − μ)/σ over the training window.
+  The first 50 residuals are dropped because the filter's start value still matters there.
+- **Failed refits:** non-convergence, persistence ≥ 1, ν ≤ 2 or ω ≤ 0 means the previous
+  parameters are kept and the failure counted (RESEARCH_DESIGN Deviations, clarification 1).
+  Parameters at every refit are saved to `fit_params.parquet`.
+
+**Validation on simulated GJR-GARCH-t data:**
+- Parameters are recovered: γ within 0.04, persistence within 0.015, ν within 1.5.
+- GJR's σ forecast is within about 2% (median) of the true σ. Plain GARCH, misspecified
+  here, has about 4× the error and still passes coverage, which is a reminder of how little
+  power coverage tests have.
+- Coverage is compared with the true VaR *on the same simulated path*, never against a fixed
+  p-value. On one path the true 5% VaR itself failed CC (p = 0.026): a Type I error that a
+  correct model cannot be expected to beat.

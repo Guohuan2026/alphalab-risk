@@ -5,13 +5,21 @@ Config example:  models: [{name: hs250, type: hs, window: 250}, {type: ewma, lam
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from functools import partial
 
 from alphalab.risk.models.base import Forecast, RiskModel
 from alphalab.risk.models.ewma import EWMANormal
+from alphalab.risk.models.garch import GarchT
 from alphalab.risk.models.hs import HistoricalSimulation
 
-MODEL_TYPES: dict[str, type[RiskModel]] = {"hs": HistoricalSimulation, "ewma": EWMANormal}
+MODEL_TYPES: dict[str, Callable[..., RiskModel]] = {
+    "hs": HistoricalSimulation,
+    "ewma": EWMANormal,
+    "garch": partial(GarchT, asymmetric=False, tails="t"),  # GARCH(1,1)-t
+    "gjr": partial(GarchT, asymmetric=True, tails="t"),  # GJR-GARCH(1,1)-t
+    "fhs": partial(GarchT, asymmetric=True, tails="fhs"),  # filtered HS on GJR volatility
+}
 
 
 def build_model(spec: dict, alphas: Sequence[float]) -> RiskModel:
@@ -26,6 +34,7 @@ def build_model(spec: dict, alphas: Sequence[float]) -> RiskModel:
 __all__ = [
     "MODEL_TYPES",
     "EWMANormal",
+    "GarchT",
     "Forecast",
     "HistoricalSimulation",
     "RiskModel",

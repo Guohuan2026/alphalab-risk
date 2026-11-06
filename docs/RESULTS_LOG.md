@@ -31,3 +31,40 @@ mostly not rejected) but its normal tails are too thin (2.1% hits at 1%). This m
 behaviour on simulated GJR-GARCH-t data. These results were seen before the design freeze.
 They do not change the pre-specified model list (GARCH-t, GJR-GARCH-t, FHS, ML), which was
 written before any risk result existed (RESEARCH_DESIGN.md, commit `d935f1d`).
+
+---
+
+## 2026-11-06 — GARCH family, P1 (SPY), development sample, after `prereg-v1`
+
+Same setup as above (6,535 forecasts per model, origins 1997-01-14 → 2022-12-29).
+Pre-specified models; first results after the freeze.
+
+| Model | α | Hit rate | Kupiec p | IND p | CC p |
+|---|---|---|---|---|---|
+| GARCH(1,1)-t | 1% | 1.48% | 0.00024 | 0.25 | 0.00061 |
+| GARCH(1,1)-t | 5% | 6.53% | 5.2e-08 | 0.67 | 3.3e-07 |
+| GJR-GARCH-t | 1% | 1.39% | 0.0026 | 0.18 | 0.0044 |
+| GJR-GARCH-t | 2.5% | 3.52% | 6.4e-07 | 0.97 | 4.2e-06 |
+| GJR-GARCH-t | 5% | 6.12% | 5.8e-05 | 0.92 | 0.00030 |
+| **FHS (GJR)** | 1% | 1.13% | 0.29 | 0.27 | **0.32** |
+| **FHS (GJR)** | 2.5% | 2.86% | 0.067 | 0.53 | **0.15** |
+| **FHS (GJR)** | 5% | 5.37% | 0.17 | 0.65 | **0.36** |
+
+Reading:
+- The GARCH family removes the clustering that sinks HS (independence no longer rejected).
+- With symmetric Student-t tails, GARCH-t and GJR-t still over-hit at every level: SPY's
+  losses are negatively skewed, which a symmetric t cannot place.
+- FHS, with the same GJR volatility and empirical residual tails, is the **first model not
+  rejected at any level**. It is now the benchmark the ML models must beat on *loss*, not
+  only on coverage.
+- GJR parameter paths (312 monthly refits): α ≈ 0 (median 0.000), so positive returns
+  barely move volatility; γ 0.06–0.21, rising from about 0.10 (1997) to 0.20 (2020–22);
+  ν 4.8–8.5; persistence about 0.99.
+- Plain GARCH-t hit the stationarity boundary (α + β = 1.00000, with the optimiser
+  converged) in 13 of 312 refits (2001–2003, Oct–Nov 2008). By rule (see Deviations,
+  clarification 1) those refits kept the previous parameters. GJR had 0 such cases: the
+  leverage term absorbs what plain GARCH can only fit with infinite persistence.
+
+Caveat: coverage tests have low power against wrong-but-adequate volatility. On simulated
+data GARCH-t passed despite 4× the volatility error of GJR. "Not rejected" does not mean
+best; the loss-based comparison (next step) decides that.

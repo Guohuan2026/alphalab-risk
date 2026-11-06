@@ -75,8 +75,13 @@ def run_forecasts(
     make_model: Callable[[], RiskModel],
     settings: EngineSettings,
     include_lockbox: bool = False,
+    fits: list[dict] | None = None,
 ) -> pd.DataFrame:
-    """Walk-forward forecasts. Index: origin date t; columns var_*, es_*, sigma."""
+    """Walk-forward forecasts. Index: origin date t; columns var_*, es_*, sigma.
+
+    If ``fits`` is a list, one dict per refit is appended: the origin date plus the
+    model's ``fit_info()`` (e.g. GARCH parameters), giving parameter paths over time.
+    """
     r = returns.sort_index()
     if r.isna().any():
         raise ValueError("returns contain NaN; build the portfolio series first")
@@ -88,6 +93,9 @@ def run_forecasts(
         if k % settings.refit_every == 0:
             lo = 0 if settings.window == "expanding" else max(0, t + 1 - settings.window_size)
             model.fit(values[lo : t + 1])
+            info = model.fit_info()
+            if fits is not None and info:
+                fits.append({"origin": r.index[t], **info})
         rows.append(model.predict(values[: t + 1]).as_row())
     out = pd.DataFrame(rows, index=pd.DatetimeIndex(r.index[origins], name="origin"))
     log.info(

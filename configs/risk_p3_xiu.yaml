@@ -37,3 +37,6 @@ risk:                    # docs/RESEARCH_DESIGN.md §4-5; `alphalab forecast` th
     - {type: hs, window: 250}
     - {type: hs, window: 500}
     - {type: ewma, lam: 0.94}
+    - {type: garch}        # GARCH(1,1)-t
+    - {type: gjr}          # GJR-GARCH(1,1)-t (leverage)
+    - {type: fhs}          # filtered HS: GJR volatility x empirical residual tails

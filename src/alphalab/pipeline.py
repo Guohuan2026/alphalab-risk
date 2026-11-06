@@ -223,11 +223,15 @@ def run_forecast(cfg: Config, include_lockbox: bool = False) -> Path:
             "LOCKBOX OPENED: forecasting into the held-out period (%s on)", cfg.risk.lockbox_start
         )
     settings = cfg.risk.engine()
-    frames, per_model = [], {}
+    frames, per_model, fit_rows = [], {}, []
     for spec in cfg.risk.models:
         name = cfg.risk.model(spec).name
-        f = run_forecasts(ret, lambda spec=spec: cfg.risk.model(spec), settings, include_lockbox)
+        fits: list[dict] = []
+        f = run_forecasts(
+            ret, lambda spec=spec: cfg.risk.model(spec), settings, include_lockbox, fits
+        )
         frames.append(f.assign(model=name))
+        fit_rows += [{"model": name, **row} for row in fits]
         per_model[name] = {
             "spec": spec,
             "n": len(f),
@@ -237,6 +241,8 @@ def run_forecast(cfg: Config, include_lockbox: bool = False) -> Path:
     out = _results_dir(cfg, proc)
     sfx = _suffix(include_lockbox)
     pd.concat(frames).to_parquet(out / f"forecasts{sfx}.parquet")
+    if fit_rows:  # parameter paths (GARCH family): one row per model per refit
+        pd.DataFrame(fit_rows).to_parquet(out / f"fit_params{sfx}.parquet", index=False)
     (out / f"forecast_manifest{sfx}.json").write_text(
         json.dumps(
             {

@@ -270,4 +270,13 @@ Patton, Ziegel & Chen (2019); Basel Committee, *Minimum capital requirements for
 
 ## Deviations from `prereg-v1`
 
-*None yet.* Format: date · section · change · reason · made before/after seeing affected results.
+Format: date · section · change · reason · made before/after seeing affected results.
+
+1. **2026-11-06 · §5 · Clarification (not a change): failed GARCH refits.** The design did
+   not say what happens when a refit fails. Rule implemented: a refit counts as failed if the
+   optimiser does not converge, or the estimates are non-stationary (persistence ≥ 1), have
+   ν ≤ 2 or ω ≤ 0. The previous parameters are then kept and the failure is counted; the
+   first fit must succeed. Reason: an integrated or explosive variance process is not a valid
+   forecasting model, and dropping forecasts would make samples differ across models. The rule
+   was written with the model code, before the first real run. That run then showed it
+   binding for plain GARCH-t (13/312 refits); the rule was not altered after seeing that.

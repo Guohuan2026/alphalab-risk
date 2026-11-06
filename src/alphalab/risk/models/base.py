@@ -59,6 +59,10 @@ class RiskModel(ABC):
         """Estimate parameters. Default: nothing to estimate."""
         return self
 
+    def fit_info(self) -> dict:
+        """Estimated parameters after the last fit (saved per refit date). Default: none."""
+        return {}
+
     @abstractmethod
     def predict(self, history: np.ndarray) -> Forecast:
         """Forecast for the day after ``history[-1]``."""
