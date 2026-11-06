@@ -4,10 +4,12 @@ Educational, production-style quant research platform in Python (src layout, pac
 Owner is learning: explain what each important command does and why, briefly.
 
 ## Environment
-- macOS, Python 3.12 via uv, virtual env at `.venv/` (activate: `source .venv/bin/activate`).
+- macOS, Python 3.12 via uv. The virtual env lives at `~/.venvs/alphalab`, outside iCloud;
+  `.venv` is a symlink to it (activate: `source .venv/bin/activate`).
 - One-shot setup/verification: `bash scripts/setup_mac.sh` (log: `logs/setup_mac.log`).
-- Known issue: macOS can mark `.venv/lib/python3.12/site-packages/*.pth` as hidden (iCloud-synced
-  Documents), so Python skips them and `import alphalab` fails. Fix: `chflags nohidden .venv/lib/python3.12/site-packages/*.pth`.
+- Why outside iCloud: `~/Documents` is iCloud-synced; iCloud marks every file in an in-project
+  venv as hidden within a second, and Python 3.12 skips hidden `.pth` files, so `import alphalab`
+  fails. Never recreate the venv inside the project; `scripts/setup_mac.sh` sets this up.
 
 ## Commands
 - Tests: `python -m pytest -q` (offline); live Yahoo: `python -m pytest -m network -q`
