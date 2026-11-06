@@ -221,3 +221,32 @@ r_t = μ + σ_t z_t,  z_t ~ unit-variance t(ν)
 - Coverage is compared with the true VaR *on the same simulated path*, never against a fixed
   p-value. On one path the true 5% VaR itself failed CC (p = 0.026): a Type I error that a
   correct model cannot be expected to beat.
+
+## 11. Comparing models: losses, ES backtests, DM and MCS
+
+Coverage tests ask whether a model is *acceptable*; these tools ask which is *better*.
+
+- **Scoring rules** (`backtest/losses.py`). A loss is *strictly consistent* if its expected
+  value is minimised only by the true forecast. VaR (a quantile) has the **tick loss**
+  `(α − 1{y ≤ v})(y − v)`. ES alone has no such loss: it is not elicitable (Gneiting 2011).
+  The *pair* (VaR, ES) is (Fissler & Ziegel 2016). **FZ0** (Patton, Ziegel & Chen 2019):
+  `−1{y ≤ v}(v − y)/(α e) + v/e + ln(−e) − 1`, written in return space (v, e < 0). Its
+  differences do not depend on the units of returns. Tests confirm that misstating VaR
+  and/or ES by ±10% raises the mean FZ0.
+- **McNeil–Frey** (`backtest/es.py`). On VaR-hit days, ξ = L − ES should average zero;
+  H1: ES too small. Bootstrap p-value from centred residuals; a standardised version
+  divides by σ. Fewer than 5 hits gives NaN, not a p-value. `severity_ratio` = realised
+  mean tail loss / forecast ES.
+- **Diebold–Mariano** (`backtest/compare.py`). d = loss_A − loss_B; Newey–West HAC
+  variance (Bartlett, lag ⌊4(n/100)^{2/9}⌋). *Measured caveat:* with AR(1) differentials
+  (φ = 0.5) the naive t-test falsely rejects ~30%, HAC ~10%. So HAC removes most of the
+  distortion and DM p-values are mildly liberal under strong autocorrelation.
+- **Model Confidence Set** (Hansen, Lunde & Nason 2011, `arch.bootstrap.MCS`, range
+  statistic, block bootstrap, 90%): the set of models that cannot be distinguished from the
+  best. This is the **headline** comparison, because it controls for comparing many models
+  at once.
+
+Validation on simulated GJR-GARCH-t data (true VaR/ES known): FZ0 ranks the truth first,
+then GJR, FHS, GARCH, EWMA, HS. The MCS keeps {truth, GJR, FHS} and drops HS and EWMA. DM
+finds GJR better than EWMA (p = 0.015). McNeil–Frey rejects EWMA's normal ES
+(severity 1.10) and accepts the truth and GJR.

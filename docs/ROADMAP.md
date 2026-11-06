@@ -23,9 +23,9 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 ## Week 2 — Econometric models and backtesting
 5. ✅ GARCH(1,1)-t, GJR-GARCH-t, filtered HS (via `arch`). HAR moves to week 3 with the
    feature-based models, since it needs the feature matrix.
-6. `backtest/`: ✅ Kupiec, Christoffersen, Basel traffic light (done in week 1); DQ; tick and FZ0 losses;
-   McNeil–Frey ES test; Diebold–Mariano; Model Confidence Set.
-7. First full econometric results on P1, plus a write-up.
+6. ✅ `backtest/`: Kupiec, Christoffersen, Basel traffic light; tick and FZ0 losses; McNeil–Frey;
+   Diebold–Mariano; Model Confidence Set. *(Remaining: Engle–Manganelli DQ test.)*
+7. ✅ First full econometric results on P1 (docs/RESULTS_LOG.md).
 
 ## Week 3 — Machine learning, stress and interpretability
 8. Linear quantile regression (control), QRF, gradient boosting (quantile loss),

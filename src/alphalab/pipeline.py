@@ -13,11 +13,10 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 import alphalab
-from alphalab.backtest import coverage_tests, traffic_light
+from alphalab.backtest.report import evaluate
 from alphalab.config import Config
 from alphalab.data.providers import get_provider
 from alphalab.data.providers.fred import FredSource
@@ -261,8 +260,8 @@ def run_forecast(cfg: Config, include_lockbox: bool = False) -> Path:
     return out
 
 
-def run_backtest(cfg: Config, include_lockbox: bool = False) -> pd.DataFrame:
-    """Coverage tests per model and alpha -> backtest_coverage[_lockbox].csv.
+def run_backtest(cfg: Config, include_lockbox: bool = False) -> dict[str, pd.DataFrame]:
+    """All backtest tables -> backtest_{coverage,es,losses,dm}[_lockbox].csv.
 
     Without the lockbox flag: the development sample. With it: ONLY the lockbox period,
     reported separately so the two are never blended.
@@ -275,20 +274,14 @@ def run_backtest(cfg: Config, include_lockbox: bool = False) -> pd.DataFrame:
         raise FileNotFoundError(f"{path} not found; run forecast first")
     fc = pd.read_parquet(path)
     ret = pd.read_parquet(proc / "portfolio_daily.parquet")["ret"]
-    rows = []
+    evs = {}
     for name, f in fc.groupby("model", sort=False):
         ev = attach_outcomes(f.drop(columns="model"), ret)
         if include_lockbox:
             ev = ev[ev["target_date"] >= pd.Timestamp(cfg.risk.lockbox_start)]
-        for a in cfg.risk.alphas:
-            hits = (ev["loss_next"] > ev[f"var_{a:g}"]).to_numpy()
-            row = {"model": name, **coverage_tests(hits, a).to_dict()}
-            row["first_target"] = str(ev["target_date"].iloc[0].date())
-            row["last_target"] = str(ev["target_date"].iloc[-1].date())
-            if np.isclose(a, 0.01):
-                row |= {f"tl_{k}": v for k, v in traffic_light(hits).items()}
-            rows.append(row)
-    table = pd.DataFrame(rows)
-    table.to_csv(out / f"backtest_coverage{sfx}.csv", index=False)
-    log.info("wrote %s", out / f"backtest_coverage{sfx}.csv")
-    return table
+        evs[name] = ev
+    tables = evaluate(evs, cfg.risk.alphas)
+    for key, table in tables.items():
+        table.to_csv(out / f"backtest_{key}{sfx}.csv", index=False)
+    log.info("wrote backtest tables to %s", out)
+    return tables

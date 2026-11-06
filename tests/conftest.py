@@ -49,3 +49,41 @@ def config_yaml(tmp_path):
         "provider_options: {seed: 1}\n"
     )
     return p
+
+
+# ---------- shared simulated forecasts (computed once per test session) ----------
+SIM_ALPHAS = (0.01, 0.025, 0.05)
+
+
+@pytest.fixture(scope="session")
+def sim6000():
+    from alphalab.risk.simulate import simulate_gjr_garch_t
+
+    return simulate_gjr_garch_t(6000, seed=1, start="1995-01-03")
+
+
+@pytest.fixture(scope="session")
+def sim_evals(sim6000):
+    """Walk-forward forecasts + outcomes on simulated GJR-GARCH-t data for every model,
+    plus the TRUE forecasts. Returns {name: (evaluated frame, fit_info rows)}."""
+    from alphalab.risk.engine import EngineSettings, attach_outcomes, run_forecasts
+    from alphalab.risk.models import build_model
+
+    r = sim6000["ret"]
+    s = EngineSettings(min_train=1000, refit_every=21)
+    specs = {
+        "hs": {"type": "hs", "window": 250},
+        "ewma": {"type": "ewma"},
+        "garch": {"type": "garch"},
+        "gjr": {"type": "gjr"},
+        "fhs": {"type": "fhs"},
+    }
+    out = {}
+    for name, spec in specs.items():
+        fits: list[dict] = []
+        f = run_forecasts(r, lambda spec=spec: build_model(spec, SIM_ALPHAS), s, fits=fits)
+        out[name] = (attach_outcomes(f, r), fits)
+    truth = sim6000[[c for c in sim6000 if c.startswith("true_")] + ["sigma"]].shift(-1)
+    truth.columns = [c.replace("true_", "") for c in truth.columns]
+    out["true"] = (attach_outcomes(truth.reindex(out["gjr"][0].index), r), [])
+    return out

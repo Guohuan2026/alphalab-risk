@@ -68,3 +68,44 @@ Reading:
 Caveat: coverage tests have low power against wrong-but-adequate volatility. On simulated
 data GARCH-t passed despite 4× the volatility error of GJR. "Not rejected" does not mean
 best; the loss-based comparison (next step) decides that.
+
+---
+
+## 2026-11-06 — Loss-based comparison and ES backtests, P1 (SPY), development sample
+
+Same 6,535 forecasts per model as above. FZ0 = joint (VaR, ES) loss; MCS at 90%
+(2,000 block-bootstrap reps); McNeil–Frey with 10,000 bootstrap reps (so p = 9.999e-05
+means p < 1/10,001).
+
+**Mean FZ0 loss (lower = better) and Model Confidence Set**
+
+| Model | α = 1% | α = 2.5% | α = 5% |
+|---|---|---|---|
+| HS-250 | −3.098 | −3.372 | −3.593 |
+| HS-500 | −3.009 | −3.305 | −3.532 |
+| EWMA-normal | −3.097 | −3.461 | −3.699 |
+| GARCH-t | −3.294 (in MCS) | −3.527 | −3.721 |
+| GJR-GARCH-t | −3.319 (in MCS) | −3.551 | −3.745 |
+| **FHS-GJR** | **−3.338** (in MCS) | **−3.570** (MCS = {FHS}) | **−3.755** (MCS = {FHS}) |
+
+**Diebold–Mariano, FZ0, other model vs FHS-GJR** (positive stat = FHS better)
+
+| vs FHS | α = 1% | α = 2.5% | α = 5% |
+|---|---|---|---|
+| GJR-t | 1.69 (p 0.091) | 2.63 (p 0.009) | 2.29 (p 0.022) |
+| GARCH-t | 1.67 (p 0.094) | 2.59 (p 0.010) | 3.11 (p 0.002) |
+| EWMA | 3.84 (p 0.0001) | 3.74 (p 0.0002) | 3.53 (p 0.0004) |
+| HS-250 | 2.77 (p 0.006) | 3.74 (p 0.0002) | 4.38 (p < 0.0001) |
+
+**McNeil–Frey ES test** (severity = realised mean tail loss / forecast ES; 1 = right):
+EWMA 1.12–1.18 (p < 0.0001 at every α); HS-250 1.06–1.10 (p 0.004–0.023); GARCH-t,
+GJR-t and FHS 0.97–1.02 (raw p ≥ 0.17). Standardised version: GJR-t rejected at 5%
+(p = 0.010), GARCH-t borderline (p = 0.035), FHS not rejected (p ≥ 0.24).
+
+Reading:
+- FHS-GJR is the econometric benchmark on every criterion: coverage, ES, FZ0, MCS.
+- At 1% the data cannot separate FHS from the t-tail GARCH models (DM p ≈ 0.09; all three
+  in the MCS). Few tail events means low power, as anticipated in RESEARCH_DESIGN §4.
+- Normal tails (EWMA) understate ES most: realised tail losses are 14% above forecast at
+  the FRTB level (2.5%).
+- Bar for the ML models (H2a): beat FHS-GJR on FZ0 and enter or displace it in the MCS.

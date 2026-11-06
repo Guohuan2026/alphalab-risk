@@ -68,10 +68,16 @@ def main(argv: list[str] | None = None) -> int:
         out = run_forecast(cfg, include_lockbox=args.include_lockbox)
         print(f"results: {out}")
     elif args.command == "backtest":
-        table = run_backtest(cfg, include_lockbox=args.include_lockbox)
-        cols = ["model", "alpha", "n", "hits", "hit_rate", "p_pof", "p_ind", "p_cc"]
+        t = run_backtest(cfg, include_lockbox=args.include_lockbox)
+        views = {
+            "coverage": ["model", "alpha", "n", "hits", "hit_rate", "p_pof", "p_ind", "p_cc"],
+            "es": ["model", "alpha", "n_hits", "severity_ratio", "p_raw", "p_std"],
+            "losses": ["model", "alpha", "mean_fz0", "rank_fz0", "mcs_p_fz0", "in_mcs_fz0"],
+        }
         with pd.option_context("display.width", 120, "display.float_format", "{:.4g}".format):
-            print(table[cols].to_string(index=False))
+            for key, cols in views.items():
+                print(f"\n== {key} ==")
+                print(t[key][cols].to_string(index=False))
     elif args.command == "snapshots":
         for s in RawSnapshotStore(cfg.data_dir).list(cfg.provider):
             print(s)

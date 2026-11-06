@@ -1,5 +1,6 @@
-"""Forecast evaluation: coverage tests now; ES tests and loss comparisons next."""
+"""Forecast evaluation: coverage (VaR), ES backtests, loss functions, model comparison."""
 
+from alphalab.backtest.compare import diebold_mariano, model_confidence_set, newey_west_lrv
 from alphalab.backtest.coverage import (
     CoverageResult,
     christoffersen_ind,
@@ -7,5 +8,20 @@ from alphalab.backtest.coverage import (
     kupiec_pof,
     traffic_light,
 )
+from alphalab.backtest.es import ESTestResult, mcneil_frey
+from alphalab.backtest.losses import fz0_loss, tick_loss
 
-__all__ = ["CoverageResult", "christoffersen_ind", "coverage_tests", "kupiec_pof", "traffic_light"]
+__all__ = [
+    "CoverageResult",
+    "ESTestResult",
+    "christoffersen_ind",
+    "coverage_tests",
+    "diebold_mariano",
+    "fz0_loss",
+    "kupiec_pof",
+    "mcneil_frey",
+    "model_confidence_set",
+    "newey_west_lrv",
+    "tick_loss",
+    "traffic_light",
+]

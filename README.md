@@ -15,8 +15,8 @@ Confidence Set) with a focus on stress periods.
 - Plan: **[docs/ROADMAP.md](docs/ROADMAP.md)**
 
 **Status: Risk week 2 — design frozen (`prereg-v1`); HS, EWMA, GARCH-t, GJR-GARCH-t and FHS
-backtested on SPY 1997–2022 (see [docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)).** Next: ES
-backtests and loss-based comparison (FZ0, Diebold–Mariano, Model Confidence Set). The Python package and CLI are still called `alphalab`.
+backtested on SPY 1997–2022 (see [docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)).** ES backtests
+and loss-based comparison done: FHS-GJR is the econometric benchmark. Next: ML models (week 3). The Python package and CLI are still called `alphalab`.
 
 *History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
 returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is

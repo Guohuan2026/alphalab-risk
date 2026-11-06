@@ -9,16 +9,16 @@ import pytest
 
 import alphalab.risk.models.garch as garch_mod
 from alphalab.backtest import coverage_tests
-from alphalab.risk.engine import EngineSettings, attach_outcomes, run_forecasts
+from alphalab.risk.engine import EngineSettings, run_forecasts
 from alphalab.risk.models import GarchT, build_model
-from alphalab.risk.simulate import GJRParams, gjr_variance_filter, simulate_gjr_garch_t
+from alphalab.risk.simulate import GJRParams, gjr_variance_filter
 
 ALPHAS = (0.01, 0.025, 0.05)
 
 
-@pytest.fixture(scope="module")
-def sim():
-    return simulate_gjr_garch_t(6000, seed=1, start="1995-01-03")
+@pytest.fixture
+def sim(sim6000):
+    return sim6000
 
 
 def test_registry_names():
@@ -52,16 +52,9 @@ def test_incremental_filter_equals_full_recompute(sim):
     np.testing.assert_allclose(inc, full, rtol=1e-10)
 
 
-@pytest.fixture(scope="module")
-def sim_runs(sim):
-    r = sim["ret"]
-    s = EngineSettings(min_train=1000, refit_every=21)
-    out = {}
-    for kind in ("garch", "gjr", "fhs"):
-        fits: list[dict] = []
-        f = run_forecasts(r, lambda kind=kind: build_model({"type": kind}, ALPHAS), s, fits=fits)
-        out[kind] = (attach_outcomes(f, r), fits)
-    return out
+@pytest.fixture
+def sim_runs(sim_evals):
+    return sim_evals
 
 
 def _sigma_err(sim, f):
