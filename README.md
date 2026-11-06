@@ -14,8 +14,9 @@ Confidence Set) with a focus on stress periods.
 - Research design, hypotheses and leakage safeguards: **[docs/RESEARCH_DESIGN.md](docs/RESEARCH_DESIGN.md)**
 - Plan: **[docs/ROADMAP.md](docs/ROADMAP.md)**
 
-**Status: Risk week 1 — portfolio series, features and simulated ground truth done; forecast
-engine and first baselines next.** No risk models yet. The Python package and CLI are still called `alphalab`.
+**Status: Risk week 1 done — walk-forward engine, HS/EWMA baselines and coverage tests run
+on SPY 1997–2022 (see [docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)).** Next: freeze the design
+(`prereg-v1`), then GARCH-family models and ES/loss-based comparison. The Python package and CLI are still called `alphalab`.
 
 *History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
 returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is
@@ -32,7 +33,7 @@ preserved at git tag `v0.1-equity-research`.
 | Returns | `src/alphalab/returns/core.py` | Total/price returns from raw corporate actions, forward-built TRI, monthly compounding, forward/trailing returns |
 | Look-ahead check | `src/alphalab/core/lookahead.py` | Truncation test: `f(data[:d])[d] == f(data)[d]` |
 | Trading calendar (M2) | `src/alphalab/core/calendar.py` | NYSE sessions via `exchange_calendars`: gap checks, month completeness, synthetic dates |
-| CLI | `src/alphalab/cli.py` | `alphalab ingest | build | snapshots --config …` |
+| CLI | `src/alphalab/cli.py` | `alphalab ingest | build | forecast | backtest | snapshots --config …` |
 
 ## Quick start (macOS)
 

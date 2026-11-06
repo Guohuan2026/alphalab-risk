@@ -14,6 +14,8 @@ import yaml
 
 from alphalab.core.calendar import get_calendar
 from alphalab.portfolio.core import REBALANCE_RULES, validate_weights
+from alphalab.risk.engine import EngineSettings
+from alphalab.risk.models import build_model
 
 
 @dataclass
@@ -55,6 +57,48 @@ class FeaturesConfig:
             raise ValueError("features.fred_lag_sessions must be >= 1 (FRED publishes next day)")
 
 
+def _default_models() -> list[dict]:
+    return [{"type": "hs", "window": 250}, {"type": "ewma", "lam": 0.94}]
+
+
+@dataclass
+class RiskConfig:
+    """Forecast/backtest settings shared by every model (docs/RESEARCH_DESIGN.md §4)."""
+
+    alphas: list[float] = field(default_factory=lambda: [0.01, 0.025, 0.05])
+    min_train: int = 1000
+    refit_every: int = 21
+    window: str = "expanding"
+    window_size: int | None = None
+    oos_start: str | None = None
+    lockbox_start: str | None = None  # first TARGET date held out until the end
+    models: list[dict] = field(default_factory=_default_models)
+
+    def __post_init__(self):
+        self.alphas = sorted(float(a) for a in self.alphas)
+        self.engine()  # validates window settings
+        models = [self.model(spec) for spec in self.models]
+        names = [m.name for m in models]
+        need = max(m.min_history for m in models)
+        if self.min_train < need:
+            raise ValueError(f"risk.min_train={self.min_train} < {need} observations a model needs")
+        if len(set(names)) != len(names):
+            raise ValueError(f"risk.models have duplicate names: {names}; set 'name' explicitly")
+
+    def engine(self) -> EngineSettings:
+        return EngineSettings(
+            min_train=self.min_train,
+            refit_every=self.refit_every,
+            window=self.window,
+            window_size=self.window_size,
+            oos_start=self.oos_start,
+            lockbox_start=self.lockbox_start,
+        )
+
+    def model(self, spec: dict):
+        return build_model(spec, self.alphas)
+
+
 @dataclass
 class Config:
     provider: str
@@ -68,6 +112,7 @@ class Config:
     validation: ValidationConfig = field(default_factory=ValidationConfig)
     portfolio: PortfolioConfig | None = None
     features: FeaturesConfig | None = None
+    risk: RiskConfig | None = None
 
     def __post_init__(self):
         if not self.universe:
@@ -85,6 +130,8 @@ class Config:
             outside = sorted(set(self.portfolio.weights) - set(self.universe))
             if outside:
                 raise ValueError(f"portfolio assets not in universe: {outside}")
+        if self.risk is not None and self.portfolio is None:
+            raise ValueError("risk forecasting needs a portfolio")
         if self.features is not None:
             if self.portfolio is None:
                 raise ValueError("features need a portfolio (they describe its return series)")
@@ -107,4 +154,6 @@ def load_config(path: str | Path) -> Config:
     port = PortfolioConfig(**port_raw) if port_raw else None
     feat_raw = raw.pop("features", None)
     feat = FeaturesConfig(**feat_raw) if feat_raw is not None else None
-    return Config(**raw, validation=val, portfolio=port, features=feat)
+    risk_raw = raw.pop("risk", None)
+    risk = RiskConfig(**risk_raw) if risk_raw is not None else None
+    return Config(**raw, validation=val, portfolio=port, features=feat, risk=risk)

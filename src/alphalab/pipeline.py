@@ -13,9 +13,11 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 import alphalab
+from alphalab.backtest import coverage_tests, traffic_light
 from alphalab.config import Config
 from alphalab.data.providers import get_provider
 from alphalab.data.providers.fred import FredSource
@@ -31,6 +33,7 @@ from alphalab.returns.core import (
     to_wide,
     total_return_index,
 )
+from alphalab.risk.engine import attach_outcomes, run_forecasts
 
 log = logging.getLogger(__name__)
 
@@ -188,3 +191,98 @@ def _build_features(cfg: Config, store: RawSnapshotStore, prices, port_ret, out:
         "n_complete_rows": len(complete),
         "nan_share_by_column": feats.isna().mean().round(4).to_dict(),
     }
+
+
+# ---------- risk forecasting and backtesting ----------
+def _processed_dir(cfg: Config) -> Path:
+    snap = RawSnapshotStore(cfg.data_dir).latest(cfg.provider, snapshot_request(cfg))
+    proc = cfg.data_dir / "processed" / cfg.provider / snap
+    if not (proc / "portfolio_daily.parquet").exists():
+        raise FileNotFoundError(f"no portfolio_daily.parquet in {proc}; run build first")
+    return proc
+
+
+def _results_dir(cfg: Config, proc: Path) -> Path:
+    out = cfg.data_dir / "results" / cfg.portfolio.name / proc.name
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
+def _suffix(include_lockbox: bool) -> str:
+    return "_lockbox" if include_lockbox else ""
+
+
+def run_forecast(cfg: Config, include_lockbox: bool = False) -> Path:
+    """Walk-forward forecasts for every configured model -> forecasts[_lockbox].parquet."""
+    if cfg.risk is None:
+        raise ValueError("config has no 'risk' section")
+    proc = _processed_dir(cfg)
+    ret = pd.read_parquet(proc / "portfolio_daily.parquet")["ret"]
+    if include_lockbox:
+        log.warning(
+            "LOCKBOX OPENED: forecasting into the held-out period (%s on)", cfg.risk.lockbox_start
+        )
+    settings = cfg.risk.engine()
+    frames, per_model = [], {}
+    for spec in cfg.risk.models:
+        name = cfg.risk.model(spec).name
+        f = run_forecasts(ret, lambda spec=spec: cfg.risk.model(spec), settings, include_lockbox)
+        frames.append(f.assign(model=name))
+        per_model[name] = {
+            "spec": spec,
+            "n": len(f),
+            "first_origin": str(f.index[0].date()) if len(f) else None,
+            "last_origin": str(f.index[-1].date()) if len(f) else None,
+        }
+    out = _results_dir(cfg, proc)
+    sfx = _suffix(include_lockbox)
+    pd.concat(frames).to_parquet(out / f"forecasts{sfx}.parquet")
+    (out / f"forecast_manifest{sfx}.json").write_text(
+        json.dumps(
+            {
+                "created_utc": datetime.now(UTC).isoformat(),
+                "alphalab_version": alphalab.__version__,
+                "processed": str(proc),
+                "risk": asdict(cfg.risk),
+                "lockbox_opened": include_lockbox,
+                "models": per_model,
+            },
+            indent=2,
+            default=str,
+        )
+    )
+    log.info("wrote %s", out / f"forecasts{sfx}.parquet")
+    return out
+
+
+def run_backtest(cfg: Config, include_lockbox: bool = False) -> pd.DataFrame:
+    """Coverage tests per model and alpha -> backtest_coverage[_lockbox].csv.
+
+    Without the lockbox flag: the development sample. With it: ONLY the lockbox period,
+    reported separately so the two are never blended.
+    """
+    proc = _processed_dir(cfg)
+    out = _results_dir(cfg, proc)
+    sfx = _suffix(include_lockbox)
+    path = out / f"forecasts{sfx}.parquet"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found; run forecast first")
+    fc = pd.read_parquet(path)
+    ret = pd.read_parquet(proc / "portfolio_daily.parquet")["ret"]
+    rows = []
+    for name, f in fc.groupby("model", sort=False):
+        ev = attach_outcomes(f.drop(columns="model"), ret)
+        if include_lockbox:
+            ev = ev[ev["target_date"] >= pd.Timestamp(cfg.risk.lockbox_start)]
+        for a in cfg.risk.alphas:
+            hits = (ev["loss_next"] > ev[f"var_{a:g}"]).to_numpy()
+            row = {"model": name, **coverage_tests(hits, a).to_dict()}
+            row["first_target"] = str(ev["target_date"].iloc[0].date())
+            row["last_target"] = str(ev["target_date"].iloc[-1].date())
+            if np.isclose(a, 0.01):
+                row |= {f"tl_{k}": v for k, v in traffic_light(hits).items()}
+            rows.append(row)
+    table = pd.DataFrame(rows)
+    table.to_csv(out / f"backtest_coverage{sfx}.csv", index=False)
+    log.info("wrote %s", out / f"backtest_coverage{sfx}.csv")
+    return table

@@ -16,13 +16,13 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 2. ✅ **Features** (`features/`, `providers/fred.py`): HAR realized variance, range-based
    variance, VIX, credit and term spreads (FRED, lagged one session); every feature PIT-tested.
    Synthetic GARCH-t generator with known true VaR/ES for model tests.
-3. **Risk-model interface + forecast engine** (`risk/`): expanding/rolling windows, refit
+3. ✅ **Risk-model interface + forecast engine** (`risk/`): expanding/rolling windows, refit
    schedule, engine-level truncation test; HS and EWMA baselines.
 4. Freeze the design: tag `prereg-v1`.
 
 ## Week 2 — Econometric models and backtesting
 5. GARCH(1,1)-t, GJR-GARCH-t, filtered HS, HAR (via `arch`).
-6. `backtest/`: Kupiec, Christoffersen, DQ, Basel traffic light; tick and FZ0 losses;
+6. `backtest/`: ✅ Kupiec, Christoffersen, Basel traffic light (done in week 1); DQ; tick and FZ0 losses;
    McNeil–Frey ES test; Diebold–Mariano; Model Confidence Set.
 7. First full econometric results on P1, plus a write-up.
 

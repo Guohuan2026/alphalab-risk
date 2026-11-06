@@ -25,3 +25,14 @@ features:                # docs/METHODOLOGY.md §7; downloaded by `alphalab inge
   fred: [BAA10Y, T10Y3M] # credit and term spreads, lagged 1 session (published next morning)
   fred_lag_sessions: 1
   range_asset: SPY       # SPY high/low/open/close -> range-based variance
+risk:                    # docs/RESEARCH_DESIGN.md §4-5; `alphalab forecast` then `alphalab backtest`
+  alphas: [0.01, 0.025, 0.05]   # tail probabilities: VaR 99% / 97.5% / 95%
+  min_train: 1000        # ~4 years of history before the first forecast
+  refit_every: 21        # re-estimate parameters monthly; filters update daily
+  window: expanding
+  oos_start: "1997-01-02"   # first origin (later if 1000 sessions are not yet available)
+  lockbox_start: "2023-01-01" # held out: opened ONCE with --include-lockbox
+  models:
+    - {type: hs, window: 250}
+    - {type: hs, window: 500}
+    - {type: ewma, lam: 0.94}

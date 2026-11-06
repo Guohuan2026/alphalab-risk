@@ -149,3 +149,45 @@ correct GARCH should recover σ_t; coverage tests should accept the true VaR and
 slow model during simulated volatility bursts. A useful fact for interviews: under a normal
 distribution ES/VaR at 1% is 1.15, but with ν = 6 it exceeds 1.2. So a model that is
 calibrated for VaR under normality still understates ES when tails are fat.
+
+## 9. Forecast engine and VaR coverage tests
+
+**Model contract** (`risk/models/base.py`). `fit(train)` estimates parameters on refit dates
+(every 21 sessions); `predict(history)` returns next-day VaR, ES and σ every day from all
+returns known at the origin. The same split is used in production: parameters are reviewed
+monthly, filters update daily. VaR/ES are positive loss numbers; α is the *tail
+probability* (0.01 = 99% VaR).
+
+**Walk-forward engine** (`risk/engine.py`). For each origin *t*: refit if due, then
+forecast the loss on *t+1*. Refit dates count from the first eligible origin, so they do not
+depend on later data. **Engine truncation test:** running on `returns[:d]` must give the
+identical forecast at origin *d* (tested for every model). **Lockbox:** origins whose target
+falls on or after `lockbox_start` (2023-01-01) are refused unless `--include-lockbox` is
+passed. Lockbox results are written and tested separately, never blended with the
+development sample.
+
+**Baselines.**
+- *Historical simulation* (HS-250, HS-500): empirical quantile and tail mean of the last N
+  losses. It reacts slowly, and a crash day drops out abruptly after N days.
+- *EWMA-normal* (RiskMetrics, λ = 0.94): σ²_{t+1} = λσ²_t + (1−λ)r_t², VaR = σz_α,
+  ES = σφ(z_α)/α. It reacts fast, but its tails are normal (thin).
+
+**Coverage tests** (`backtest/coverage.py`). Hit = L_{t+1} > VaR_t. Under a correct model
+hits are i.i.d. Bernoulli(α).
+- *Kupiec POF*: is the hit frequency α? LR ~ χ²(1).
+- *Christoffersen IND*: P(hit | hit yesterday) = P(hit | no hit yesterday)? LR ~ χ²(1).
+- *Conditional coverage*: CC = POF + IND ~ χ²(2).
+- *Basel traffic light* (99% VaR, 250-day windows): green 0–4, yellow 5–9, red 10+.
+
+How the tests themselves were validated:
+1. **Hand-computed values:** 5 hits in 250 days at 1% gives LR = 1.956, p = 0.162.
+2. **Size:** with a correct model, CC rejects about 5% of the time at the 5% level. So a
+   true model *will* occasionally be rejected. In the simulations, the true VaR failed once
+   in six checks (p = 0.011); that is expected, not a bug.
+3. **Power:** clustered hits at the correct frequency pass Kupiec but fail IND.
+4. **Simulated truth:** on GJR-GARCH-t data, the true VaR passes; EWMA-normal under-covers
+   at 1% (fat tails) but not at 5%; HS's hits cluster.
+
+What these tests cannot do: they say whether a model is *acceptable*, not which model is
+*better*. That needs loss functions (tick loss, FZ0) with Diebold–Mariano tests and a
+Model Confidence Set (week 2). They also ignore ES; ES backtests follow in week 2.

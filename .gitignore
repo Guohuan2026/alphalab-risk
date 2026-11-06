@@ -13,6 +13,7 @@ htmlcov/
 # Data: never commit downloaded or derived data (size, licensing - CRSP is licensed!)
 data/raw/
 data/processed/
+data/results/
 
 # OS / editors
 .DS_Store
