@@ -2,11 +2,17 @@
 
 **Machine Learning for Portfolio Risk Forecasting and Stress Resilience**
 
-Status: design draft, 2026-11-06, branch `alphalab-risk`. The pre-pivot code is preserved at
-tag `v0.1-equity-research`. This document is written *before* any out-of-sample risk result
-has been looked at. When it is final, it is frozen with a git tag (`prereg-v1`), so that every
-later deviation is visible in the history. That is the honest substitute for formal
-pre-registration.
+Status: **frozen at git tag `prereg-v1` (2026-11-06)**, branch `alphalab-risk`. The pre-pivot
+code is preserved at tag `v0.1-equity-research`. This design was first written (commit
+`d935f1d`) before any risk result existed. Before the freeze, only the development-sample
+results of the HS and EWMA baselines on P1 had been seen; they are recorded in
+[RESULTS_LOG.md](RESULTS_LOG.md). No GARCH-family, ML or lockbox result had been produced.
+
+**Deviation rule.** After `prereg-v1`, this file is not edited silently. Any change to the
+hypotheses, data, forecast contract, model list, tuning budget or evaluation is added to the
+"Deviations" section at the end, with the date, the reason, and whether it was made before or
+after seeing the affected results. `git diff prereg-v1 -- docs/RESEARCH_DESIGN.md` shows every
+change. This is the honest substitute for formal pre-registration.
 
 ---
 
@@ -261,3 +267,7 @@ Glosten, Jagannathan & Runkle (1993); Bollerslev (1986); Barone-Adesi, Giannopou
 Vosper (1999); Meinshausen (2006); Corsi (2009); Hansen, Lunde & Nason (2011);
 Acerbi & Szekely (2014); Fissler & Ziegel (2016); Nolde & Ziegel (2017);
 Patton, Ziegel & Chen (2019); Basel Committee, *Minimum capital requirements for market risk* (FRTB).
+
+## Deviations from `prereg-v1`
+
+*None yet.* Format: date · section · change · reason · made before/after seeing affected results.
