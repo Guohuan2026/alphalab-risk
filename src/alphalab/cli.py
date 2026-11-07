@@ -17,6 +17,7 @@ from alphalab.pipeline import (
     run_forecast,
     run_ingest,
     run_ingest_features,
+    run_stress,
 )
 
 
@@ -31,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         ("snapshots", "list saved snapshots for the configured provider"),
         ("forecast", "walk-forward VaR/ES forecasts for every model in the 'risk' section"),
         ("backtest", "coverage tests (Kupiec, Christoffersen, traffic light) on saved forecasts"),
+        ("stress", "H3: performance by stress regime, DM/HAC tests vs the benchmark, event study"),
     ]:
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("--config", required=True, help="path to YAML config")
@@ -78,6 +80,11 @@ def main(argv: list[str] | None = None) -> int:
             for key, cols in views.items():
                 print(f"\n== {key} ==")
                 print(t[key][cols].to_string(index=False))
+    elif args.command == "stress":
+        t = run_stress(cfg)
+        with pd.option_context("display.width", 120, "display.float_format", "{:.4g}".format):
+            print(t["regression"].to_string(index=False))
+            print(t["event_summary"].to_string(index=False))
     elif args.command == "snapshots":
         for s in RawSnapshotStore(cfg.data_dir).list(cfg.provider):
             print(s)

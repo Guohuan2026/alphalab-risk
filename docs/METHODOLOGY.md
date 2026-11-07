@@ -305,3 +305,23 @@ flagged and scored, never dropped, so all models stay on the same dates.
   FZ0 but do not beat the true parametric model, a check that the evaluation does not
   automatically reward flexibility. The quantile forest had 2 floored forecasts even
   there: a leaf whose training returns are mostly gains can give a positive 5% quantile.
+
+## 14. Stress analysis (H3) (`stress/analysis.py`; rules: Clarification 4)
+
+- **Regimes:** 8 ex-ante episodes, assigned by *target date*; calm = no episode. VIX regime
+  by VIX at the *origin* (> 30), known when the forecast is made. Conditioning on the
+  outcome would bias the comparison.
+- **Per regime and model:** n, expected and observed hits, Kupiec p, mean FZ0, ES severity.
+  The expected-hits column is the power warning (e.g. 6.9 expected at 1% when VIX > 30).
+- **Tests vs the benchmark (FHS-GJR):** DM within regimes; HAC regression d = a + b·D + e,
+  where *a* is the calm-period difference and *b* the extra difference in stress (H3: b ≠ 0).
+  The HAC regression matches statsmodels exactly (test). Regimes with < 30 days (or < 30
+  outside) get no DM, regression or MCS: a short sample can contain no episode day, and the
+  dummy would be degenerate (a bug found by a test).
+- **Power lesson from simulated data:** HS broke down in the high-volatility regime (hit
+  rate 2.6× the target), yet its FZ0 stress shift was not significant (p ≈ 0.2), because
+  FZ0 is very noisy on volatile days. A non-significant b is therefore *not* evidence that
+  stress makes no difference; read it together with the hit rates.
+- **Event study:** the 1% largest losses; VaR path k = −5..20 relative to k = −5; the
+  committed summary is "days to 1.5×". Because large losses usually strike when VaR is
+  already elevated, the k = 1 and k = 5 ratios are reported too, as extra description.

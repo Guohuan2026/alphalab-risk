@@ -73,6 +73,7 @@ class RiskConfig:
     oos_start: str | None = None
     lockbox_start: str | None = None  # first TARGET date held out until the end
     var_floor: float = 1e-4  # VaR >= 1 bp, ES >= VaR for every model (Deviation 2)
+    benchmark: str | None = None  # reference model for stress DM/regressions (Clarification 4)
     models: list[dict] = field(default_factory=_default_models)
 
     def __post_init__(self):
@@ -83,6 +84,8 @@ class RiskConfig:
         need = max(m.min_history for m in models)
         if self.min_train < need:
             raise ValueError(f"risk.min_train={self.min_train} < {need} observations a model needs")
+        if self.benchmark is not None and self.benchmark not in names:
+            raise ValueError(f"risk.benchmark {self.benchmark!r} is not one of the models {names}")
         if len(set(names)) != len(names):
             raise ValueError(f"risk.models have duplicate names: {names}; set 'name' explicitly")
 

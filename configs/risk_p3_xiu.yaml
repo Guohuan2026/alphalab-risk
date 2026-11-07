@@ -34,6 +34,7 @@ risk:                    # docs/RESEARCH_DESIGN.md §4-5; `alphalab forecast` th
   oos_start: "1997-01-02"   # first origin (later if 1000 sessions are not yet available)
   lockbox_start: "2023-01-01" # held out: opened ONCE with --include-lockbox
   var_floor: 0.0001       # safety floor for every model: VaR >= 1bp, ES >= VaR (Deviation 2)
+  benchmark: fhs_gjr      # reference for stress DM tests and regressions (Clarification 4)
   models:
     - {type: hs, window: 250}
     - {type: hs, window: 500}

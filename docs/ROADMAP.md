@@ -31,7 +31,8 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 8. ✅ Linear benchmarks: HAR-FHS and the H2b control `linqr_l1` (lasso QR, tuned yearly;
    Deviation 2). ✅ QRF, gradient boosting (quantile loss; XGBoost unavailable), RF-volatility
    + FHS hybrid, with the same yearly tuning (Deviation 3).
-9. Stress analysis: ex-ante episodes, VIX > 30 regime, loss-differential regressions.
+9. ✅ Stress analysis: ex-ante episodes, VIX > 30 regime, loss-differential regressions,
+   reaction-speed event study (Clarification 4).
 10. SHAP and permutation importance; importance stability across refits.
 
 ## Week 4 — Robustness, dashboard, write-up

@@ -84,3 +84,45 @@ def model_confidence_set(
     out["in_mcs"] = out.index.isin(mcs.included)
     out.index.name = "model"
     return out.reset_index()
+
+
+@dataclass(frozen=True)
+class HACRegression:
+    coef: tuple[float, ...]
+    se: tuple[float, ...]
+    t: tuple[float, ...]
+    p: tuple[float, ...]
+    lag: int
+    n: int
+
+
+def hac_regression(y, X, lag: int | None = None) -> HACRegression:
+    """OLS of y on X (include a constant column yourself) with Newey–West standard errors.
+
+        β̂ = (X'X)⁻¹X'y,   V = (X'X)⁻¹ S (X'X)⁻¹,
+        S = Σ_t u_t² x_t x_t' + Σ_{k=1..q} w_k Σ_t u_t u_{t−k} (x_t x_{t−k}' + x_{t−k} x_t'),
+        w_k = 1 − k/(q+1)
+
+    Used for H3: regress a loss differential on a stress dummy; the dummy's t-stat tests
+    whether relative performance differs in stress. No small-sample correction (as
+    statsmodels' HAC with use_correction=False).
+    """
+    y = np.asarray(y, dtype=float)
+    X = np.asarray(X, dtype=float)
+    if X.ndim == 1:
+        X = X[:, None]
+    n = len(y)
+    q = default_lag(n) if lag is None else lag
+    xtx_inv = np.linalg.inv(X.T @ X)
+    beta = xtx_inv @ X.T @ y
+    u = y - X @ beta
+    xu = X * u[:, None]
+    S = xu.T @ xu
+    for k in range(1, q + 1):
+        g = xu[k:].T @ xu[:-k]
+        S += (1 - k / (q + 1)) * (g + g.T)
+    V = xtx_inv @ S @ xtx_inv
+    se = np.sqrt(np.diag(V))
+    t = beta / se
+    p = 2 * stats.norm.sf(np.abs(t))
+    return HACRegression(tuple(beta), tuple(se), tuple(t), tuple(p), q, n)

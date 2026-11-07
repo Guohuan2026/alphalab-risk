@@ -296,3 +296,35 @@ def run_backtest(cfg: Config, include_lockbox: bool = False) -> dict[str, pd.Dat
         table.to_csv(out / f"backtest_{key}{sfx}.csv", index=False)
     log.info("wrote backtest tables to %s", out)
     return tables
+
+
+def run_stress(cfg: Config) -> dict[str, pd.DataFrame]:
+    """H3 tables on the development sample -> stress_*.csv (rules: Clarification 4)."""
+    from alphalab.stress import event_study, stress_tables
+
+    if cfg.risk is None or cfg.risk.benchmark is None:
+        raise ValueError("set risk.benchmark (e.g. fhs_gjr) to run the stress analysis")
+    proc = _processed_dir(cfg)
+    out = _results_dir(cfg, proc)
+    path = out / "forecasts.parquet"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found; run forecast first")
+    fc = pd.read_parquet(path)
+    ret = pd.read_parquet(proc / "portfolio_daily.parquet")["ret"]
+    evs = {
+        name: attach_outcomes(f.drop(columns="model"), ret)
+        for name, f in fc.groupby("model", sort=False)
+    }
+    vix = None
+    fpath = proc / "features_daily.parquet"
+    if fpath.exists():
+        feats = pd.read_parquet(fpath)
+        vix = feats.get("vix")  # None when the portfolio has no VIX feature
+    tables = stress_tables(evs, cfg.risk.alphas, vix=vix, benchmark=cfg.risk.benchmark)
+    paths, summary = event_study(evs, alpha=min(cfg.risk.alphas))
+    tables["event_paths"] = paths.reset_index()
+    tables["event_summary"] = summary
+    for key, table in tables.items():
+        table.to_csv(out / f"stress_{key}.csv", index=False)
+    log.info("wrote stress tables to %s", out)
+    return tables

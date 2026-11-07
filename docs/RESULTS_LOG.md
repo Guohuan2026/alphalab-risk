@@ -210,3 +210,71 @@ configurations.
   the "few tail points" weakness anticipated in RESEARCH_DESIGN §5; the hybrid design
   (ML for scale, residuals for the tail) is the one that works.
 - Stress-period analysis (H3) and interpretability (H4) come next. The lockbox remains closed.
+
+---
+
+## 2026-11-06 — Stress analysis (H3), P1 (SPY), development sample
+
+Rules fixed and committed before any stress statistic (Clarification 4, commit `a65c036`).
+Regimes by target date: 8 episodes pooled = 1,604 days (calm 4,931); VIX at origin > 30 =
+688 days. Power: at 1%, 16.0 expected hits in the episodes and 6.9 when VIX > 30 (thin);
+at 5%, 80.2 and 34.4.
+
+**Hit rates by regime**
+
+| Model | 1% calm | 1% episodes | 1% VIX>30 | 5% calm | 5% episodes | 5% VIX>30 |
+|---|---|---|---|---|---|---|
+| FHS-GJR | 1.05% | **1.37%** | **1.02%** | 4.77% | 7.23% | **4.07%** |
+| GJR-t | 1.30% | 1.68% | 1.02% | 5.54% | 7.92% | 5.23% |
+| ML-vol + FHS | 1.05% | 2.68% | 3.05% | 5.01% | 8.67% | 7.99% |
+| linqr_l1 | 1.01% | 3.62% | 3.20% | 5.37% | 10.47% | 8.14% |
+| QRF | 1.03% | 3.99% | 5.38% | 4.70% | 10.22% | 10.76% |
+| Gradient boosting | 2.21% | 5.11% | 5.52% | 7.00% | 12.22% | 13.52% |
+| HS-250 | 0.75% | 4.05% | 4.07% | 4.06% | 10.79% | 10.61% |
+| EWMA | 1.89% | 2.68% | 1.74% | 5.21% | 8.23% | 5.67% |
+
+**Loss-differential regressions vs FHS-GJR** (FZ0; d = a + b·episode + e, HAC).
+a = difference in calm periods, b = additional difference in stress; positive = worse than FHS.
+
+| Model | α | a (p) | b (p) |
+|---|---|---|---|
+| ML-vol + FHS | 1% | **−0.105 (0.0015)** | **+0.477 (0.015)** |
+| ML-vol + FHS | 2.5% | **−0.067 (0.0008)** | **+0.306 (0.008)** |
+| ML-vol + FHS | 5% | **−0.050 (0.0002)** | **+0.197 (0.013)** |
+| QRF | 2.5% | +0.041 (0.23) | +0.434 (0.010) |
+| Gradient boosting | 2.5% | +0.046 (0.18) | +0.554 (0.002) |
+| linqr_l1 | 2.5% | −0.013 (0.76) | +0.268 (0.002) |
+| GJR-t | 2.5% | +0.011 (0.15) | +0.030 (0.094) |
+
+**MCS within stress:** pooled episodes at 2.5% and 5% = {FHS-GJR} alone; at 1% {FHS-GJR,
+GJR-t, ML-vol, HAR}. VIX > 30 at 1% and 2.5%: large sets (too few hits to separate models).
+
+**Reaction speed** (66 events = the 1% largest daily losses; VaR_1% relative to 5 sessions
+before; k = 1 is the first forecast after the loss):
+
+| Model | k = 1 | k = 5 | Days to 1.5× |
+|---|---|---|---|
+| GJR-t / FHS-GJR | 1.67 | 1.63 | 1 |
+| GARCH-t | 1.42 | 1.53 | 4 |
+| HAR-FHS | 1.41 | 1.60 | 3 |
+| EWMA | 1.37 | 1.50 | 5 |
+| ML-vol + FHS | 1.38 | 1.37 | never |
+| linqr_l1 | 1.28 | 1.37 | never |
+| Gradient boosting / QRF | 1.29 / 1.23 | 1.32 / 1.25 | never |
+| HS-250 / HS-500 | 1.16 / 1.08 | 1.23 / 1.11 | never |
+
+**Reading (H3: supported; relative performance does change in stress):**
+- FHS-GJR is the only model whose calibration survives stress (1.37% at 1% in the
+  episodes; 1.02% when VIX > 30), and the sole MCS member in the episodes at 2.5% and 5%.
+- The ML hybrid's full-sample tie with FHS-GJR is **two opposite, significant effects**:
+  better in calm markets (p ≤ 0.0015 at every α) and worse in crises (p ≤ 0.015). It is a
+  calm-weather model.
+- Every feature-based model, linear or ML, loses ground in stress (b > 0, p ≤ 0.01 at
+  2.5%). The common cause is reaction speed. GARCH-family VaR jumps 67% the day after a
+  large loss; the tree models move 23–29% and never reach 1.5×, because a tree cannot
+  forecast beyond the range of training outcomes in its leaves. GJR-t's shift is small
+  (p = 0.09).
+- Practical message for a risk team: an ML scale model may be worth using in calm regimes,
+  but an econometric model must govern in stress, e.g. a regime switch on VIX or a
+  max(ML, GARCH) rule. That rule is a hypothesis for future work, not tested here (it
+  would be a post-hoc model).
