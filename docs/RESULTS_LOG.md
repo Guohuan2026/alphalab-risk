@@ -371,3 +371,30 @@ P1 −0.067 (p 0.0008); P2 −0.043 (p 0.046); P3 −0.006 (p 0.68); rolling −
   consistent with the "few tail points" mechanism.
 - FHS-GJR's only coverage rejection is P2 at 1% (1.40% hits, p = 0.027): one rejection in
   12 cells, about what a 5% test produces by chance, but reported.
+
+---
+
+## 2026-11-07 — LOCKBOX PROTOCOL (written and pushed before any lockbox number exists)
+
+- **What is frozen:** code, configs and model specifications at commit `2cba50d` (pushed to
+  GitHub 2026-11-07 14:55 UTC). No model, grid, feature or rule may change because of the
+  lockbox results.
+- **Period:** targets 2023-01-01 → 2026-10-30 (~960 trading days). Raw snapshots were taken
+  on 2026-11-06 and are unchanged (hash-verified at load).
+- **Runs, each executed once:** P1 (headline), then P2 and P3 (robustness), with
+  `alphalab forecast --include-lockbox` then `alphalab backtest --include-lockbox`. Models
+  are refitted on their usual schedule through the lockbox, using only data available at
+  each origin (as in a live deployment).
+- **Integrity check:** the lockbox run also re-forecasts the development period. Those
+  forecasts must be bit-identical to the saved development forecasts, proving nothing
+  changed.
+- **Reported, whatever the outcome:** coverage, ES test, FZ0 ranks, MCS and DM, as in the
+  development sample. **Power warning, stated in advance:** about 9.6 expected hits at 1%
+  and 48 at 5%, so the lockbox can confirm or contradict the *direction* of the main
+  findings but cannot by itself establish small differences.
+- **Pre-stated reading:** the main findings (FHS-GJR ≥ every ML model on FZ0; direct-quantile
+  ML worst) are *consistent* with the lockbox if FHS-GJR is in the lockbox MCS at 2.5% and
+  5% and neither QRF nor GBQ has lower mean FZ0 than FHS-GJR. Otherwise they are reported as
+  *not replicated*.
+- **Not done:** no stress-episode analysis inside the lockbox. Clarification 4 defined no
+  lockbox episodes (e.g. the April 2025 tariff shock), and defining one now would be post hoc.
