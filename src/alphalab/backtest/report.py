@@ -41,6 +41,7 @@ def evaluate(
             loss, var, es = ev["loss_next"], ev[f"var_{a:g}"], ev[f"es_{a:g}"]
             hits = (loss > var).to_numpy()
             row = {"model": name, **coverage_tests(hits, a).to_dict()}
+            row["n_floored"] = int(ev["floored"].sum()) if "floored" in ev else 0
             row["first_target"] = str(ev["target_date"].iloc[0].date())
             row["last_target"] = str(ev["target_date"].iloc[-1].date())
             if np.isclose(a, 0.01):
@@ -50,6 +51,13 @@ def evaluate(
             es_rows.append(
                 {"model": name, **mcneil_frey(loss, var, es, a, sigma, seed=seed).to_dict()}
             )
+            n_bad = int((es <= 0).sum())
+            if n_bad:
+                raise ValueError(
+                    f"{name}: {n_bad} forecasts with ES <= 0 at alpha={a:g} (first "
+                    f"{es[es <= 0].index[0].date()}); FZ0 is undefined. Fix the model; "
+                    "invalid forecasts are never scored silently."
+                )
             fz[name] = fz0_loss(-loss, var, es, a)
             tk[name] = tick_loss(-loss, var, a)
         fz_df, tk_df = pd.DataFrame(fz), pd.DataFrame(tk)

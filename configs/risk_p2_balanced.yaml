@@ -33,6 +33,7 @@ risk:                    # docs/RESEARCH_DESIGN.md §4-5; `alphalab forecast` th
   window: expanding
   oos_start: "1997-01-02"   # first origin (later if 1000 sessions are not yet available)
   lockbox_start: "2023-01-01" # held out: opened ONCE with --include-lockbox
+  var_floor: 0.0001       # safety floor for every model: VaR >= 1bp, ES >= VaR (Deviation 2)
   models:
     - {type: hs, window: 250}
     - {type: hs, window: 500}
@@ -40,3 +41,7 @@ risk:                    # docs/RESEARCH_DESIGN.md §4-5; `alphalab forecast` th
     - {type: garch}        # GARCH(1,1)-t
     - {type: gjr}          # GJR-GARCH(1,1)-t (leverage)
     - {type: fhs}          # filtered HS: GJR volatility x empirical residual tails
+    - {type: har}          # HAR variance regression + empirical residual tails (linear)
+    # H2b control: lasso quantile regression on all features, penalty tuned yearly on the last
+    # 20% of the training window (Deviation 2: plain QR gave invalid forecasts, collinearity)
+    - {type: linqr, l1_grid: [0.0, 1.0e-5, 1.0e-4, 1.0e-3], refit_every: 252}

@@ -12,6 +12,7 @@ from alphalab.risk.models.base import Forecast, RiskModel
 from alphalab.risk.models.ewma import EWMANormal
 from alphalab.risk.models.garch import GarchT
 from alphalab.risk.models.hs import HistoricalSimulation
+from alphalab.risk.models.linear import HARFHS, LinearQuantileRegression
 
 MODEL_TYPES: dict[str, Callable[..., RiskModel]] = {
     "hs": HistoricalSimulation,
@@ -19,6 +20,8 @@ MODEL_TYPES: dict[str, Callable[..., RiskModel]] = {
     "garch": partial(GarchT, asymmetric=False, tails="t"),  # GARCH(1,1)-t
     "gjr": partial(GarchT, asymmetric=True, tails="t"),  # GJR-GARCH(1,1)-t
     "fhs": partial(GarchT, asymmetric=True, tails="fhs"),  # filtered HS on GJR volatility
+    "har": HARFHS,  # HAR variance regression + empirical residual tails
+    "linqr": LinearQuantileRegression,  # linear quantile regression on features (H2b control)
 }
 
 
@@ -35,6 +38,8 @@ __all__ = [
     "MODEL_TYPES",
     "EWMANormal",
     "GarchT",
+    "HARFHS",
+    "LinearQuantileRegression",
     "Forecast",
     "HistoricalSimulation",
     "RiskModel",

@@ -28,8 +28,9 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 7. ✅ First full econometric results on P1 (docs/RESULTS_LOG.md).
 
 ## Week 3 — Machine learning, stress and interpretability
-8. Linear quantile regression (control), QRF, gradient boosting (quantile loss),
-   ML-volatility + FHS hybrids; yearly nested tuning with an embargo.
+8. ✅ Linear benchmarks: HAR-FHS and the H2b control `linqr_l1` (lasso QR, tuned yearly;
+   Deviation 2). Next: QRF, gradient boosting (quantile loss), ML-volatility + FHS hybrids,
+   with the same yearly tuning and embargo.
 9. Stress analysis: ex-ante episodes, VIX > 30 regime, loss-differential regressions.
 10. SHAP and permutation importance; importance stability across refits.
 

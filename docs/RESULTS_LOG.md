@@ -109,3 +109,46 @@ Reading:
 - Normal tails (EWMA) understate ES most: realised tail losses are 14% above forecast at
   the FRTB level (2.5%).
 - Bar for the ML models (H2a): beat FHS-GJR on FZ0 and enter or displace it in the MCS.
+
+---
+
+## 2026-11-06 — Linear benchmarks (HAR-FHS, linear QR), P1 (SPY), development sample
+
+**Plain linear QR failed (finding; led to Deviation 2).** On the 17 features it gave 27 of
+6,535 forecasts with VaR ≤ 0 (worst 5% VaR −25.9%, the day after the 1997-10-27 crash, when
+features were 4–9 sd from their training mean). Collinear features (Parkinson vs
+Garman–Klass: standardised 1% coefficients −0.0147 and +0.0134) offset each other until
+an unusual day breaks the offset. Clipping features to their training range left 13 invalid
+days (incl. Lehman, 2008-09-15). Tuned lasso QR (`linqr_l1`) left 4, all in 1998–99
+(λ = 0.001 chosen in most years, zeroing 6–12 of 17 features; weak λ in the first years when
+the tuning sample is smallest). A 1 bp floor handles those 4.
+
+Reproducibility check: re-running all models gave **bit-identical** forecasts for HS-250,
+HS-500, EWMA, GARCH-t, GJR-t, FHS-GJR and HAR-FHS; the floor touched only the 4
+`linqr_l1` days.
+
+| Model | α | Hit rate | CC p | ES severity (p) | Mean FZ0 | FZ0 rank (of 8) | In MCS |
+|---|---|---|---|---|---|---|---|
+| FHS-GJR | 1% | 1.13% | 0.32 | 0.99 (0.61) | −3.338 | 1 | yes |
+| HAR-FHS | 1% | 1.29% | <0.001 | 1.00 (0.54) | −3.309 | 4 | yes |
+| linqr_l1 | 1% | 1.65% | <0.001 | 0.99 (0.70) | −3.317 | 3 | yes |
+| FHS-GJR | 2.5% | 2.86% | 0.15 | 0.97 (0.89) | −3.570 | 1 | yes |
+| HAR-FHS | 2.5% | 2.98% | 0.014 | 1.00 (0.54) | −3.523 | 4 | no |
+| linqr_l1 | 2.5% | 3.55% | <0.001 | 1.03 (0.062) | −3.517 | 5 | yes (p 0.14) |
+| FHS-GJR | 5% | 5.37% | 0.36 | 0.98 (0.88) | −3.755 | 1 | yes (alone) |
+| HAR-FHS | 5% | 5.81% | 0.012 | 0.99 (0.66) | −3.702 | 4 | no |
+| linqr_l1 | 5% | 6.63% | <0.001 | 1.05 (0.004) | −3.574 | 7 | no (p 0.09) |
+
+DM (FZ0), FHS-GJR vs: HAR-FHS p = 0.40 / 0.016 / 0.0001 (1% / 2.5% / 5%); linqr_l1
+p = 0.66 / 0.15 / 0.22.
+
+**Sensitivity to the floor.** `linqr_l1`'s 5% mean FZ0 is dominated by ONE floored day,
+1999-01-06 (FZ0 = 951.7: a 1 bp VaR forecast followed by a real loss). Excluding the 4
+floored days, its mean FZ0 is −3.334 / −3.547 / −3.730, still behind FHS-GJR at every
+level. That one day is also why DM cannot separate linqr_l1 from FHS at 5% despite the large
+mean gap: one extreme loss inflates the variance. The floor rule was fixed before these
+numbers were seen; the headline uses it as computed.
+
+Reading: neither linear benchmark beats FHS-GJR. The linear control over-hits at every
+level (1.65% at 1%). FHS-GJR remains the sole MCS member at 5%. These are the bars for the
+ML models in the next step: beat FHS-GJR (H2a) and beat `linqr_l1` (H2b).

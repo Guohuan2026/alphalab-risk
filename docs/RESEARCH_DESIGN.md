@@ -280,3 +280,28 @@ Format: date · section · change · reason · made before/after seeing affected
    forecasting model, and dropping forecasts would make samples differ across models. The rule
    was written with the model code, before the first real run. That run then showed it
    binding for plain GARCH-t (13/312 refits); the rule was not altered after seeing that.
+
+2. **2026-11-06 · §5, §4 · Change: the H2b control becomes L1-penalised (lasso) quantile
+   regression, refit yearly; a 1 bp safety floor applies to every model.** Made **after
+   seeing** the plain control's development-sample forecasts on P1, before any tree/boosting
+   ML model existed.
+   - *What happened.* Plain linear QR on the 17 features produced 27 forecasts (of 6,535)
+     with VaR ≤ 0, i.e. a "5% worst case" that is a gain. The cause is collinear features
+     (Parkinson vs Garman–Klass variance; rv_5 vs |r|) with large offsetting coefficients,
+     and extrapolation on stress days 4–9 standard deviations from the training mean. FZ0
+     cannot score ES ≤ 0.
+   - *Steps taken, in order.* (a) Clip each feature to the training window's [0.5%, 99.5%]
+     quantiles: 13 invalid days remained. (b) The owner chose lasso QR on the same features,
+     with λ tuned at each refit by the design's tuning protocol (last 20% of the training
+     window, 1-pair embargo, grid {0, 1e-5, 1e-4, 1e-3} including "no penalty", criterion =
+     mean tick loss over the VaR levels): 4 invalid days remained, all in 1998–99 when the
+     tuning sample is smallest. (c) The owner chose a safety floor for every model: VaR ≥
+     0.0001 and ES ≥ VaR, with every floored forecast flagged (`floored`, `n_floored`).
+   - *Refit frequency.* The exact L1 solver is about 70× slower than unpenalised IRLS, so the
+     control refits every 252 sessions instead of 21 (a per-model `refit_every`). Whether the
+     ML models also refit yearly is decided, and recorded, before they are first run.
+   - *Direction of the bias.* Regularising and clipping make the control stronger, so H2b
+     (ML beats the linear control) becomes harder to support: conservative. The floor
+     changes no other model (verified: zero floored forecasts for HS, EWMA, GARCH family,
+     HAR). Plain QR stays in the code and its failure is reported as a stress-robustness
+     finding (RESULTS_LOG).

@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 from alphalab.features.targets import next_day_loss
-from alphalab.risk.models.base import RiskModel
+from alphalab.risk.models.base import Forecast, RiskModel
 
 log = logging.getLogger(__name__)
 WINDOWS = ("expanding", "rolling")
@@ -43,12 +43,15 @@ class EngineSettings:
     window_size: int | None = None  # for "rolling"
     oos_start: str | None = None  # first allowed origin (if enough history by then)
     lockbox_start: str | None = None  # first TARGET date held out
+    var_floor: float = 1e-4  # safety floor: VaR >= 1 bp and ES >= VaR (RESEARCH_DESIGN Dev. 2)
 
     def __post_init__(self):
         if self.window not in WINDOWS:
             raise ValueError(f"window must be one of {WINDOWS}")
         if self.window == "rolling" and (self.window_size is None or self.window_size < 2):
             raise ValueError("rolling window needs window_size >= 2")
+        if self.var_floor <= 0:
+            raise ValueError("var_floor must be positive (FZ0 needs ES > 0)")
         if self.min_train < 2 or self.refit_every < 1:
             raise ValueError("min_train must be >= 2 and refit_every >= 1")
 
@@ -70,12 +73,33 @@ def forecast_origins(
     return pos
 
 
+def apply_floor(fc: Forecast, floor: float) -> dict[str, float]:
+    """Safety floor applied identically to every model: VaR_a >= floor and ES_a >= VaR_a.
+
+    A downside-risk forecast of zero or less ("tomorrow's 5% worst case is a gain") is not
+    a valid forecast, and FZ0 cannot score it. Flooring instead of dropping keeps every model
+    on the same dates, and the floored forecast is then scored (FZ0 penalises a near-zero
+    risk forecast heavily). The ``floored`` column records every intervention.
+    """
+    row = fc.as_row()
+    floored = False
+    for a in fc.var:
+        v, e = fc.var[a], fc.es[a]
+        v2 = max(v, floor)
+        e2 = max(e, v2)
+        floored |= (v2 != v) or (e2 != e)
+        row[f"var_{a:g}"], row[f"es_{a:g}"] = v2, e2
+    row["floored"] = floored
+    return row
+
+
 def run_forecasts(
     returns: pd.Series,
     make_model: Callable[[], RiskModel],
     settings: EngineSettings,
     include_lockbox: bool = False,
     fits: list[dict] | None = None,
+    features: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Walk-forward forecasts. Index: origin date t; columns var_*, es_*, sigma.
 
@@ -88,15 +112,28 @@ def run_forecasts(
     values = r.to_numpy(dtype=float)
     origins = forecast_origins(r.index, settings, include_lockbox)
     model = make_model()
+    X = None
+    if model.uses_features:
+        if features is None:
+            raise ValueError(f"{model.name} needs features; build them first")
+        X = features.reindex(r.index)  # exact date alignment; missing dates become NaN rows
+    every = model.refit_every or settings.refit_every  # per-model override (e.g. yearly)
     rows = []
     for k, t in enumerate(origins):
-        if k % settings.refit_every == 0:
+        if k % every == 0:
             lo = 0 if settings.window == "expanding" else max(0, t + 1 - settings.window_size)
-            model.fit(values[lo : t + 1])
+            if X is None:
+                model.fit(values[lo : t + 1])
+            else:
+                model.fit(values[lo : t + 1], X.iloc[lo : t + 1])
             info = model.fit_info()
             if fits is not None and info:
                 fits.append({"origin": r.index[t], **info})
-        rows.append(model.predict(values[: t + 1]).as_row())
+        if X is None:
+            fc = model.predict(values[: t + 1])
+        else:
+            fc = model.predict(values[: t + 1], X.iloc[: t + 1])
+        rows.append(apply_floor(fc, settings.var_floor))
     out = pd.DataFrame(rows, index=pd.DatetimeIndex(r.index[origins], name="origin"))
     log.info(
         "%s: %d forecasts %s..%s",

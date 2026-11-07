@@ -72,6 +72,7 @@ class RiskConfig:
     window_size: int | None = None
     oos_start: str | None = None
     lockbox_start: str | None = None  # first TARGET date held out until the end
+    var_floor: float = 1e-4  # VaR >= 1 bp, ES >= VaR for every model (Deviation 2)
     models: list[dict] = field(default_factory=_default_models)
 
     def __post_init__(self):
@@ -93,6 +94,7 @@ class RiskConfig:
             window_size=self.window_size,
             oos_start=self.oos_start,
             lockbox_start=self.lockbox_start,
+            var_floor=self.var_floor,
         )
 
     def model(self, spec: dict):

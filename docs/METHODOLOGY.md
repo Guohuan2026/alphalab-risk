@@ -250,3 +250,31 @@ Validation on simulated GJR-GARCH-t data (true VaR/ES known): FZ0 ranks the trut
 then GJR, FHS, GARCH, EWMA, HS. The MCS keeps {truth, GJR, FHS} and drops HS and EWMA. DM
 finds GJR better than EWMA (p = 0.015). McNeil–Frey rejects EWMA's normal ES
 (severity 1.10) and accepts the truth and GJR.
+
+## 12. Feature-based models and the linear benchmarks
+
+**Feature contract.** Feature models receive the feature rows for the same dates as the
+returns. Training pairs are (x_s, r_{s+1}), the last being (x_{t−1}, r_t); the forecast
+for t+1 uses x_t. Tests check this with a model that records what it is given, and the
+engine truncation test is repeated with features.
+
+**HAR-FHS** (`har`). OLS of r²_{s+1} on [1, RV1_s, RV5_s, RV22_s] (Corsi 2009); variance
+floored at 5% of the training variance; FHS tails from residuals z = r/σ̂. *Known bias:* the
+regressors are noisy proxies of σ², so OLS coefficients are attenuated (errors in
+variables). On simulated GJR data they sum to about 0.71 against a true persistence of 0.98.
+Intraday realized variance would reduce this.
+
+**Linear quantile regression.** `linqr`: q_τ(r_{s+1}|x_s) = x_s'β_τ for τ ∈ {α} ∪
+{α(k−½)/K}, K = 5; ES = −mean of the sub-α quantiles; quantiles sorted across levels to
+prevent crossing; features clipped to training [0.5%, 99.5%] quantiles and standardised
+with training moments. `linqr_l1` (the H2b control): the same model with an L1 penalty,
+λ tuned at each yearly refit on the last 20% of the training pairs (1-pair embargo;
+statistics for tuning from the earlier part only), exact LP solver (HiGHS).
+
+**Why plain linear QR failed on SPY** (a finding, RESULTS_LOG): collinear features get
+large offsetting coefficients, and on stress days (e.g. after 1997-10-27, Lehman
+2008-09-15) the offset breaks and the 5% quantile turns positive. Clipping alone was not
+enough; L1 shrinkage plus the floor were needed (RESEARCH_DESIGN Deviation 2).
+
+**Safety floor** (engine, every model): VaR ≥ 1 bp and ES ≥ VaR. Invalid forecasts are
+flagged and scored, never dropped, so all models stay on the same dates.

@@ -222,12 +222,23 @@ def run_forecast(cfg: Config, include_lockbox: bool = False) -> Path:
             "LOCKBOX OPENED: forecasting into the held-out period (%s on)", cfg.risk.lockbox_start
         )
     settings = cfg.risk.engine()
+    features = None
+    if any(cfg.risk.model(spec).uses_features for spec in cfg.risk.models):
+        fpath = proc / "features_daily.parquet"
+        if not fpath.exists():
+            raise FileNotFoundError(f"{fpath} not found; add a 'features' section and rebuild")
+        features = pd.read_parquet(fpath)
     frames, per_model, fit_rows = [], {}, []
     for spec in cfg.risk.models:
         name = cfg.risk.model(spec).name
         fits: list[dict] = []
         f = run_forecasts(
-            ret, lambda spec=spec: cfg.risk.model(spec), settings, include_lockbox, fits
+            ret,
+            lambda spec=spec: cfg.risk.model(spec),
+            settings,
+            include_lockbox=include_lockbox,
+            fits=fits,
+            features=features,
         )
         frames.append(f.assign(model=name))
         fit_rows += [{"model": name, **row} for row in fits]

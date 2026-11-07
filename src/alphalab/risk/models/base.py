@@ -11,6 +11,12 @@ Two calls, mirroring how a bank runs a production model:
 ``train`` is what the estimation window allows (expanding or rolling); ``history`` is
 every return known at the origin. Both end at the origin t. Neither ever contains t+1.
 
+Feature-based models (``uses_features = True``) receive, in addition, the feature rows for
+the same dates: ``fit(train, X_train)`` and ``predict(history, X_history)``, where row s of
+X holds features stamped at s (data published by the end of day s). Supervised models pair
+X row s with the return on s+1, so the last training pair is (x_{t−1}, r_t) and the
+forecast uses x_t. They never see r_{t+1}.
+
 Units: returns are daily simple returns. VaR and ES are POSITIVE loss numbers
 (VaR 0.023 = "lose more than 2.3% with probability alpha").
 """
@@ -20,6 +26,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 import numpy as np
 
@@ -43,6 +50,8 @@ class Forecast:
 class RiskModel(ABC):
     alphas: Sequence[float] = field(default=(0.01, 0.025, 0.05))
     name: str = ""
+    refit_every: int | None = None  # override the engine's refit frequency for this model
+    uses_features: ClassVar[bool] = False
 
     def __post_init__(self):
         self.alphas = tuple(float(a) for a in self.alphas)
