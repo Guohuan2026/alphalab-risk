@@ -49,8 +49,10 @@ echo ".venv -> $(readlink .venv)"
 source .venv/bin/activate
 python --version
 
-step "3. Install AlphaLab + dev tools"
-uv pip install -e ".[dev]" || fail "install"
+step "3. Install AlphaLab + dev tools (exact versions from requirements-lock.txt)"
+# -c = constraints: install the project, but force every dependency to the locked version,
+# so results reproduce even after libraries change defaults (quantile-forest 1.5 did).
+uv pip install -e ".[dev]" -c requirements-lock.txt || fail "install"
 
 step "4. Offline unit tests"
 unhide

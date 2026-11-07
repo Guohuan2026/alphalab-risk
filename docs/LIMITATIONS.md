@@ -60,3 +60,12 @@ they can distort conclusions.
     for an end-of-day forecast, not for one produced at 4:00 pm. Range-based variance
     ignores the overnight gap, so it understates total variance. P3 (Canada) uses US
     stress indicators (VIX, US spreads) as global proxies.
+14. **Quantile forest implementation detail and library dependence (found 2026-11-07 by the
+    clean-clone check).** All QRF results used `quantile-forest` 1.4.2 with its defaults:
+    `max_samples_leaf=1` (each leaf keeps ONE training value, so a forecast distribution
+    has ~300 values, one per tree) and linear quantile interpolation. That is coarser than
+    Meinshausen's original QRF, which keeps every leaf value, and may contribute to the QRF's
+    poor deep-tail results; the model was not changed after the fact (results are frozen).
+    Version 1.5.0 gives materially different quantiles even with these settings pinned
+    (about 20–40% at the 5% level in a test case), so QRF results reproduce only with the
+    locked versions in `requirements-lock.txt`, which the setup script installs.

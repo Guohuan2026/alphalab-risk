@@ -205,13 +205,20 @@ class QuantileRandomForest(_TunedFeatureModel):
         return RandomForestQuantileRegressor(
             n_estimators=self.n_estimators,
             max_features=self.max_features,
+            # Pinned explicitly: these were the library defaults when every logged result was
+            # produced (quantile-forest 1.4.2). max_samples_leaf=1 keeps ONE training value per
+            # leaf, so a forecast distribution has ~n_estimators values: coarser than
+            # Meinshausen's original QRF (LIMITATIONS #14). Kept, not changed: results are frozen.
+            max_samples_leaf=1,
             n_jobs=-1,
             random_state=self.seed,
             **cfg,
         ).fit(X, y)
 
     def _q(self, obj, X, levels) -> np.ndarray:
-        q = np.asarray(obj.predict(X, quantiles=[float(t) for t in levels]))
+        # interpolation pinned: quantile-forest 1.5.0 changed its default from "linear" to
+        # "averaged_inverted_cdf", which moved forecasts by ~20% (found by the clean-clone check).
+        q = np.asarray(obj.predict(X, quantiles=[float(t) for t in levels], interpolation="linear"))
         return q.reshape(len(X), len(levels))
 
     def _var(self, obj, X):

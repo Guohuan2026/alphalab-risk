@@ -349,3 +349,17 @@ flagged and scored, never dropped, so all models stay on the same dates.
 - **Caveat:** importance is not causation. Correlated features (rv_5, rv_22, gk_22) share
   credit: permuting one while its twins remain understates the family's importance. That is
   why C1 is stated at the family level.
+
+## 16. Reproducibility
+
+- **Data:** immutable, hash-verified raw snapshots; every build and forecast run records the
+  snapshot it used.
+- **Code:** git history on GitHub (`Guohuan2026/alphalab-risk`), with design, clarifications
+  and lockbox protocol committed before the results they govern.
+- **Environment:** `requirements-lock.txt` pins the exact package versions behind every
+  logged result; `scripts/setup_mac.sh` installs them as constraints. *Why it is needed:* a
+  clean clone on 2026-11-07 installed `quantile-forest` 1.5.0 instead of 1.4.2, and its
+  quantile forecasts differed materially from the logged ones (LIMITATIONS #14). Unpinned
+  "latest" installs are not reproducible research.
+- **Determinism:** fixed seeds; single-threaded forest prediction; bit-identical refit
+  tests; dev-period forecasts re-checked bit-for-bit in the lockbox runs.
