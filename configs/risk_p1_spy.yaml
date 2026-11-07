@@ -44,3 +44,7 @@ risk:                    # docs/RESEARCH_DESIGN.md §4-5; `alphalab forecast` th
     # H2b control: lasso quantile regression on all features, penalty tuned yearly on the last
     # 20% of the training window (Deviation 2: plain QR gave invalid forecasts, collinearity)
     - {type: linqr, l1_grid: [0.0, 1.0e-5, 1.0e-4, 1.0e-3], refit_every: 252}
+    # ML models (Deviation 3): yearly refit + tuning on the last 20% of the training window
+    - {type: qrf}          # quantile regression forest
+    - {type: gbq}          # gradient boosting, quantile loss (XGBoost unavailable: libomp)
+    - {type: mlvol}        # random-forest volatility + out-of-bag FHS tails

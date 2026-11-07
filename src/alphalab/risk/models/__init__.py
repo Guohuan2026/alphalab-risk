@@ -13,6 +13,7 @@ from alphalab.risk.models.ewma import EWMANormal
 from alphalab.risk.models.garch import GarchT
 from alphalab.risk.models.hs import HistoricalSimulation
 from alphalab.risk.models.linear import HARFHS, LinearQuantileRegression
+from alphalab.risk.models.ml import GradientBoostingQuantile, MLVolFHS, QuantileRandomForest
 
 MODEL_TYPES: dict[str, Callable[..., RiskModel]] = {
     "hs": HistoricalSimulation,
@@ -22,6 +23,9 @@ MODEL_TYPES: dict[str, Callable[..., RiskModel]] = {
     "fhs": partial(GarchT, asymmetric=True, tails="fhs"),  # filtered HS on GJR volatility
     "har": HARFHS,  # HAR variance regression + empirical residual tails
     "linqr": LinearQuantileRegression,  # linear quantile regression on features (H2b control)
+    "qrf": QuantileRandomForest,  # quantile regression forest (Meinshausen 2006)
+    "gbq": GradientBoostingQuantile,  # gradient boosting, pinball loss, one model per level
+    "mlvol": MLVolFHS,  # random-forest volatility (|r|) + out-of-bag FHS tails
 }
 
 
@@ -38,6 +42,9 @@ __all__ = [
     "MODEL_TYPES",
     "EWMANormal",
     "GarchT",
+    "GradientBoostingQuantile",
+    "MLVolFHS",
+    "QuantileRandomForest",
     "HARFHS",
     "LinearQuantileRegression",
     "Forecast",

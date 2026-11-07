@@ -118,6 +118,8 @@ def run_forecasts(
             raise ValueError(f"{model.name} needs features; build them first")
         X = features.reindex(r.index)  # exact date alignment; missing dates become NaN rows
     every = model.refit_every or settings.refit_every  # per-model override (e.g. yearly)
+    # Block path: identical values, one call per refit block instead of one per day.
+    block_mode = X is not None and model.stateless and hasattr(model, "predict_block")
     rows = []
     for k, t in enumerate(origins):
         if k % every == 0:
@@ -129,6 +131,13 @@ def run_forecasts(
             info = model.fit_info()
             if fits is not None and info:
                 fits.append({"origin": r.index[t], **info})
+            if block_mode:  # each row uses its own x_s; parameters were fit with data <= t
+                block = origins[k : k + every]
+                rows += [
+                    apply_floor(fc, settings.var_floor) for fc in model.predict_block(X.iloc[block])
+                ]
+        if block_mode:
+            continue
         if X is None:
             fc = model.predict(values[: t + 1])
         else:

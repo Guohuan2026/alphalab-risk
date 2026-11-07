@@ -152,3 +152,61 @@ numbers were seen; the headline uses it as computed.
 Reading: neither linear benchmark beats FHS-GJR. The linear control over-hits at every
 level (1.65% at 1%). FHS-GJR remains the sole MCS member at 5%. These are the bars for the
 ML models in the next step: beat FHS-GJR (H2a) and beat `linqr_l1` (H2b).
+
+---
+
+## 2026-11-06 — Machine-learning models, P1 (SPY), development sample (main H2 evidence)
+
+Specification fixed and committed before any ML fit (Deviation 3, commit `2773c4f`). All
+11 models on the same 6,535 origins (1997-01-14 → 2022-12-29). The 8 earlier models
+reproduced **bit-identically**. Floored forecasts: only `linqr_l1` (4). ML refit and
+re-tune yearly (26 refits).
+
+**FZ0 rank (of 11) and MCS membership**
+
+| Model | α = 1% | α = 2.5% | α = 5% |
+|---|---|---|---|
+| FHS-GJR | **1** (MCS) | **1** (MCS) | 2 (MCS) |
+| ML-vol + FHS | 2 (MCS) | 2 (MCS) | **1** (MCS) |
+| GJR-t | 3 (MCS) | 3 | 3 |
+| linqr_l1 (control) | 4 (MCS) | 6 (MCS) | 10 (MCS, p 0.27) |
+| HAR-FHS | 5 (MCS) | 5 | 5 |
+| QRF | 9 | 8 | 7 |
+| Gradient boosting | 10 | 9 | 8 |
+
+**Calibration of the ML models** (hit rate; McNeil–Frey severity)
+
+| Model | 1% | 2.5% | 5% | ES severity at 2.5% |
+|---|---|---|---|---|
+| ML-vol + FHS | 1.45% (CC p 0.0001) | 3.05% (p 0.008) | 5.91% (p < 0.001) | 1.05 (p 0.024) |
+| QRF | 1.76% | 3.40% | 6.06% | 1.10 (p 0.0006) |
+| Gradient boosting | **2.92%** | **5.31%** | **8.28%** | 1.09 (p 0.0004) |
+| FHS-GJR (reference) | 1.13% (p 0.32) | 2.86% (p 0.15) | 5.37% (p 0.36) | 0.97 (p 0.89) |
+
+**Diebold–Mariano (FZ0)**
+- FHS-GJR vs QRF: FHS better at every level (p = 0.009, 0.003, 0.0007).
+- FHS-GJR vs GBQ: FHS better (p = 0.003, 0.0005, 0.0002).
+- FHS-GJR vs ML-vol: no difference (p = 0.82, 0.79, 0.95).
+- `linqr_l1` vs QRF and GBQ: the **linear control is better** at 1% (p = 0.004, 0.0006)
+  and 2.5% (p = 0.036, 0.005); no difference at 5%.
+- `linqr_l1` vs ML-vol: no difference (p = 0.85, 0.19, 0.22).
+
+**Tuning choices** (26 yearly refits): QRF leaf 50 in 17 years; GBQ the smallest trees
+(7 leaves) in 25; ML-vol leaf 50 in 15; lasso λ = 0.001 in 20. The data favoured simple
+configurations.
+
+**Reading, against the pre-registered hypotheses (development sample only):**
+- **H2a (ML beats the best econometric model): not supported.** No ML model has
+  significantly lower FZ0 than FHS-GJR. The best ML model, the hybrid, is statistically
+  tied with it (DM p ≥ 0.79; both in the MCS at every level) but is worse calibrated
+  (rejected by CC at every level; ES severity 1.05).
+- **H2b (gains come from non-linearity): not supported, and partly reversed.** The two
+  direct-quantile ML models are significantly **worse** than the linear control at 1% and
+  2.5%. Where ML helps at all (the hybrid), it is in modelling *volatility*, not the tail
+  directly.
+- **Why direct-quantile ML fails in the tail:** with only ~10–84 training observations below
+  the 1% quantile (training windows of 1,000–8,400 days), trees cannot learn the extreme tail. Gradient boosting's 1% VaR is
+  breached 2.9× as often as it should be, and both understate ES by about 10%. This is
+  the "few tail points" weakness anticipated in RESEARCH_DESIGN §5; the hybrid design
+  (ML for scale, residuals for the tail) is the one that works.
+- Stress-period analysis (H3) and interpretability (H4) come next. The lockbox remains closed.

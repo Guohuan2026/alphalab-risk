@@ -52,6 +52,9 @@ class RiskModel(ABC):
     name: str = ""
     refit_every: int | None = None  # override the engine's refit frequency for this model
     uses_features: ClassVar[bool] = False
+    # stateless: between refits the forecast depends only on fitted parameters and x_t, so
+    # the engine may call predict_block(X_rows) for all origins up to the next refit at once.
+    stateless: ClassVar[bool] = False
 
     def __post_init__(self):
         self.alphas = tuple(float(a) for a in self.alphas)

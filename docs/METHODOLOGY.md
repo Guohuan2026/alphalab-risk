@@ -278,3 +278,30 @@ enough; L1 shrinkage plus the floor were needed (RESEARCH_DESIGN Deviation 2).
 
 **Safety floor** (engine, every model): VaR ≥ 1 bp and ES ≥ VaR. Invalid forecasts are
 flagged and scored, never dropped, so all models stay on the same dates.
+
+## 13. Machine-learning models (`risk/models/ml.py`, specified in Deviation 3)
+
+| Model | What it learns | VaR / ES |
+|---|---|---|
+| `qrf`: quantile regression forest (Meinshausen 2006) | a forest whose leaves keep the training targets, i.e. a full conditional distribution | quantiles at α and α(k−½)/K; ES = mean of the sub-α quantiles |
+| `gbq`: gradient boosting, pinball loss (scikit-learn `HistGradientBoostingRegressor`) | one boosted model per quantile level | same as QRF; quantiles sorted to stop crossing |
+| `mlvol_fhs`: RF volatility + FHS | a random forest for \|r_{s+1}\|, a volatility proxy | σ̃_t × empirical VaR/ES of **out-of-bag** residuals r/σ̃ |
+
+- **Identical tuning** (one shared class, also used by the lasso control): last 20% of the
+  training pairs, 1-pair embargo, mean tick loss over the VaR levels, ties → first config,
+  refit + re-tune every 252 sessions, `random_state = 0`.
+- **Why out-of-bag residuals:** a forest's in-sample fit nearly memorises |r|, so in-sample
+  residuals are too small and VaR would be too low. A test shows the out-of-bag tail is
+  larger.
+- **Block prediction:** between refits these models depend only on x_t, so the engine
+  predicts a refit block in one call. A test checks the result is identical to day-by-day
+  prediction.
+- **Determinism (found by a test):** scikit-learn random forests predicting with
+  `n_jobs = -1` sum tree outputs in thread order, and floating-point addition is not
+  associative, so repeated runs differed in the last bits and flipped a tuning tie. Fitting
+  stays parallel; prediction is single-threaded. Every ML model now has a bit-identical
+  refit test.
+- **Validation on simulated GJR-GARCH-t data:** all three land between the truth and HS on
+  FZ0 but do not beat the true parametric model, a check that the evaluation does not
+  automatically reward flexibility. The quantile forest had 2 floored forecasts even
+  there: a leaf whose training returns are mostly gains can give a positive 5% quantile.

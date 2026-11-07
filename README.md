@@ -15,9 +15,10 @@ Confidence Set) with a focus on stress periods.
 - Plan: **[docs/ROADMAP.md](docs/ROADMAP.md)**
 
 **Status: Risk week 2 — design frozen (`prereg-v1`); HS, EWMA, GARCH-t, GJR-GARCH-t and FHS
-backtested on SPY 1997–2022 (see [docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)).** ES backtests,
-loss-based comparison and linear benchmarks (HAR, lasso QR control) done; FHS-GJR still
-ranks first. Next: tree/boosting ML models (week 3). The Python package and CLI are still called `alphalab`.
+backtested on SPY 1997–2022 (see [docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)).** All 11 models
+backtested on SPY 1997–2022: no ML model beats FHS-GJR; the RF-volatility + FHS hybrid ties
+with it; direct-quantile ML (QRF, boosting) is worse even than the linear control in the
+deep tail. Next: stress analysis (H3) and interpretability (H4). The Python package and CLI are still called `alphalab`.
 
 *History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
 returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is
