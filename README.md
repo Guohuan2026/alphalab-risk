@@ -13,6 +13,19 @@ Confidence Set) with a focus on stress periods.
 
 - Research design, hypotheses and leakage safeguards: **[docs/RESEARCH_DESIGN.md](docs/RESEARCH_DESIGN.md)**
 - Plan: **[docs/ROADMAP.md](docs/ROADMAP.md)**
+- Results, in the order they were seen: **[docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)**
+
+### Dashboard
+
+```bash
+make dashboard        # = streamlit run dashboard/app.py
+```
+
+A read-only Streamlit app over the saved results (`data/results/`, so run the pipeline
+first). Tabs: Overview (FZ0 ranking, MCS), Forecasts (VaR against realised losses, breaches),
+Backtests (coverage, ES, Diebold–Mariano heatmap), Stress (breach rates by regime, reaction
+speed), Explain (permutation importance, SHAP over time), Lockbox (development vs held-out),
+About. It never fits a model: what it shows is exactly what the results log records.
 
 **Status: Risk week 2 — design frozen (`prereg-v1`); HS, EWMA, GARCH-t, GJR-GARCH-t and FHS
 backtested on SPY 1997–2022 (see [docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)).** All 11 models

@@ -21,3 +21,6 @@ data/results/
 
 # Run logs
 logs/
+
+# Local tool settings (preview launch config)
+.claude/

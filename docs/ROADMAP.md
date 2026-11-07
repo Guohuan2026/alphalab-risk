@@ -40,7 +40,7 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
     *(Stretch, not done: Acerbi–Szekely Z2, h = 10.)*
 12. ✅ Lockbox opened once (2026-11-07; protocol pushed first): the development headline was
     NOT replicated in the calm 2023–26 period (docs/RESULTS_LOG.md).
-13. Streamlit dashboard (reads saved results; no model fitting in the app).
+13. ✅ Streamlit dashboard (`make dashboard`; reads saved results; no model fitting in the app).
 14. Research report (proposal format for supervisor / Mitacs) and a clean-clone reproducibility run.
 
 ## Later / partner-dependent
