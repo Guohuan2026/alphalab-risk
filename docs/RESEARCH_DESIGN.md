@@ -305,3 +305,29 @@ Format: date · section · change · reason · made before/after seeing affected
      changes no other model (verified: zero floored forecasts for HS, EWMA, GARCH family,
      HAR). Plain QR stays in the code and its failure is reported as a stress-robustness
      finding (RESULTS_LOG).
+
+3. **2026-11-06 · §4, §5 · Specification of the tree/boosting ML models.** Written **before
+   any of these models was fitted on real data** (only timing probes on P1 features, which
+   produce no forecasts or scores).
+   - *XGBoost → scikit-learn.* XGBoost cannot load on the project Mac (missing `libomp`), so
+     the design's named fallback is used: `HistGradientBoostingRegressor(loss="quantile")`.
+   - *Refit frequency.* All ML models refit and re-tune every 252 sessions (yearly), like the
+     control `linqr_l1`; forecasts still use the day's features x_t. The econometric models
+     keep monthly refits, which is a handicap for ML and so conservative for H2a. The
+     ML-vs-control comparison (H2b) is on equal terms.
+   - *Tuning (identical for every ML model and the control).* Last 20% of the training
+     pairs, 1-pair embargo, criterion = mean tick loss over the VaR levels, ties → first
+     grid entry. `random_state = 0` at every fit. All 17 features, untransformed (trees are
+     invariant to monotone transforms).
+   - *Grids (fixed now):*
+     - QRF (`quantile-forest`): 300 trees, `max_features = 0.5`;
+       `min_samples_leaf` ∈ {10, 50, 200}.
+     - Gradient boosting, one model per quantile level: learning rate 0.05, 200 iterations;
+       (`max_leaf_nodes`, `min_samples_leaf`) ∈ {7, 31} × {50, 200}.
+     - ML-volatility + FHS: random forest (300 trees, `max_features = 0.5`) predicting
+       |r_{s+1}|; `min_samples_leaf` ∈ {50, 200, 500}. FHS tails from **out-of-bag**
+       residuals z = r_{s+1}/σ̃_s (in-sample forest fits are overfitted and would make the
+       residuals too small). The design said "RF / XGBoost": RF is used, one hybrid only, to
+       limit the number of compared models.
+   - *ES:* QRF and boosting average quantiles at α(k−½)/K, K = 5 (as the control);
+     quantiles sorted across levels. The 1 bp floor applies.
