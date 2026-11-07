@@ -38,7 +38,8 @@ range (2008). Robustness (P2 60/40, P3 Canada, rolling window): FHS-GJR first in
 cells; ML always loses ground in stress. **Lockbox 2023–26 (opened once): not replicated.**
 In that calm period feature-based models had lower average loss (not significant on SPY),
 while FHS-GJR stayed calibrated. Conclusion: regime-dependent, with FHS-GJR the robust
-choice. Next: dashboard and write-up. The Python package and CLI are still called `alphalab`.
+choice. A fresh clone from GitHub
+reproduces P1 bit-for-bit (locked environment, `requirements-lock.txt`). Next: write-up. The Python package and CLI are still called `alphalab`.
 
 *History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
 returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is

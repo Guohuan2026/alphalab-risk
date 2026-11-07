@@ -457,3 +457,22 @@ on 1.6% of days vs 10.5%; annualised SPY volatility 14.9% vs 19.9%; 4 days with 
    *robust* choice (calibrated in every period and portfolio, and best in stress), while
    feature-based ML can have lower average loss in calm periods. Which is better depends on
    how much weight the user puts on stress performance.
+
+---
+
+## 2026-11-07 — Clean-clone reproducibility check
+
+1. **First clone** (commit `f3ae5cc`, fresh environment): 1 test failed. The fresh install
+   got `quantile-forest` 1.5.0 instead of 1.4.2, and QRF quantiles moved materially even with
+   identical settings (LIMITATIONS #14). Fix: `requirements-lock.txt` with the exact versions
+   behind every logged result, installed by `scripts/setup_mac.sh`; QRF settings made
+   explicit (commit `69e8a1c`). No result changed.
+2. **Second clone** (commit `69e8a1c`, fresh isolated environment, documented setup only):
+   254 tests passed, lint clean, live Yahoo tests passed. P1 rebuilt end-to-end from the
+   original raw snapshots (prices `20261106T222941Z_e325d363`, features
+   `20261106T222947Z_d0d2e72e`): **all 11 models' 6,535 forecasts and all four backtest
+   tables are bit-identical to the logged results.**
+
+Lesson for the write-up: without the lock file the project was *not* reproducible one day
+later. Reproducibility needs locked data (snapshots), locked code (git) **and** a locked
+environment.
