@@ -194,7 +194,7 @@ def test_forecast_and_backtest_respect_lockbox(config_yaml):
     table = tables["coverage"]
     assert len(table) == 2 * 3 and (table["last_target"] < "2021-04-01").all()
     assert "tl_green" in table.columns
-    assert set(tables) == {"coverage", "es", "losses", "dm"}
+    assert set(tables) == {"coverage", "es", "losses", "dm", "dq"}
     assert len(tables["dm"]) == 3  # one model pair x 3 alphas
     assert (out / "backtest_losses.csv").exists()
 

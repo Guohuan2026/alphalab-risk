@@ -476,3 +476,31 @@ on 1.6% of days vs 10.5%; annualised SPY volatility 14.9% vs 19.9%; 4 days with 
 Lesson for the write-up: without the lock file the project was *not* reproducible one day
 later. Reproducibility needs locked data (snapshots), locked code (git) **and** a locked
 environment.
+
+---
+
+## 2026-11-07 — Engle–Manganelli DQ test (supplementary, development samples only)
+
+The DQ test was in the pre-registered evaluation list (RESEARCH_DESIGN §7) but had not been
+implemented; it was added after the lockbox was opened. It is therefore reported for the
+**development samples only**. Computing it on the lockbox now would be an analysis added
+after seeing those results, and the lockbox tables were left untouched (md5-verified). The
+existing development tables were re-generated and are byte-identical; DQ is a new table
+(`backtest_dq.csv`). Specification: Hit_t − α on a constant, 4 lags and VaR_t; χ²(6).
+Validated on simulated data: correct size under H0 (~5%), and it rejects a model whose
+breaches depend on the VaR level that Kupiec and Christoffersen both pass.
+
+**Rejections at 5% (of 12 portfolio × α cells: P1, P2, P3, P1 rolling × 3 levels):**
+FHS-GJR 8; HAR-FHS 11; every other model 12.
+
+**P1 DQ p-values:** FHS-GJR 0.019 / 0.002 / 0.011 (1 / 2.5 / 5%); all other models < 0.0001.
+
+**Why FHS-GJR is rejected** (P1): the lag terms are not significant at 1% and 2.5% (p = 0.23,
+0.15); the VaR term is (p = 0.002, 0.0009, 0.023). Breach rate when VaR is below vs above its
+median: 1.50% vs 0.76% at 1%; 3.46% vs 2.26% at 2.5%; 5.79% vs 4.96% at 5%. FHS-GJR is right
+on average but too aggressive in calm periods and too conservative in volatile ones.
+
+**Reading:** this qualifies H1 for FHS-GJR. It is the best-calibrated model (the only one
+passing Kupiec and Christoffersen everywhere, and the least rejected by DQ), but not perfectly
+calibrated conditional on the volatility level. Its calm-period weakness mirrors H3. This
+interpretation links two development-sample results and does not use the lockbox.

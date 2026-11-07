@@ -3,8 +3,10 @@
 from alphalab.backtest.compare import diebold_mariano, model_confidence_set, newey_west_lrv
 from alphalab.backtest.coverage import (
     CoverageResult,
+    DQResult,
     christoffersen_ind,
     coverage_tests,
+    dq_test,
     kupiec_pof,
     traffic_light,
 )
@@ -17,6 +19,8 @@ __all__ = [
     "christoffersen_ind",
     "coverage_tests",
     "diebold_mariano",
+    "dq_test",
+    "DQResult",
     "fz0_loss",
     "kupiec_pof",
     "mcneil_frey",

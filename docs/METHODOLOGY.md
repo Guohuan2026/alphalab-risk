@@ -363,3 +363,13 @@ flagged and scored, never dropped, so all models stay on the same dates.
   "latest" installs are not reproducible research.
 - **Determinism:** fixed seeds; single-threaded forest prediction; bit-identical refit
   tests; dev-period forecasts re-checked bit-for-bit in the lockbox runs.
+
+## 17. Engle–Manganelli Dynamic Quantile test (`backtest/coverage.py: dq_test`)
+
+Regress the demeaned hit Hit_t = 1[L_t > VaR_t] − α on a constant, its own 4 lags and VaR_t.
+Under a correct VaR all coefficients are zero; DQ = β̂'X'Xβ̂ / (α(1 − α)) ~ χ²(6). It nests
+Kupiec (constant) and Christoffersen (lag 1) and adds the VaR regressor, which catches
+breaches that depend on the forecast's level. Example from the tests: breaches at 8% when
+VaR is low and 2% when it is high average 5%, show no clustering, and pass both classical
+tests, but DQ rejects them with p < 1e-6. Output: `backtest_dq.csv`. Development samples only
+(added after the lockbox was opened; RESULTS_LOG).

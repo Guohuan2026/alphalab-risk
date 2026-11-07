@@ -70,3 +70,53 @@ def test_traffic_light():
     assert tl["max_hits"] == 6 and tl["red"] == 0 and 0 < tl["yellow"] < 1
     assert tl["green"] + tl["yellow"] + tl["red"] == pytest.approx(1)
     assert traffic_light(h[:100])["windows"] == 0
+
+
+# ---------- Engle–Manganelli Dynamic Quantile test ----------
+def test_dq_matches_ols_by_hand():
+    import statsmodels.api as sm
+
+    from alphalab.backtest import dq_test
+
+    rng = np.random.default_rng(3)
+    hits = rng.random(800) < 0.05
+    var = rng.uniform(0.01, 0.03, 800)
+    res = dq_test(hits, var, 0.05, lags=4)
+    h = hits.astype(float) - 0.05
+    X = np.column_stack([np.ones(796)] + [h[4 - k : 800 - k] for k in range(1, 5)] + [var[4:]])
+    beta = sm.OLS(h[4:], X).fit().params
+    assert res.stat == pytest.approx(beta @ X.T @ X @ beta / (0.05 * 0.95))
+    assert res.df == 6 and res.n == 796
+
+
+def test_dq_size_under_null():
+    from alphalab.backtest import dq_test
+
+    rng = np.random.default_rng(4)
+    rej = [
+        dq_test(rng.random(1500) < 0.05, rng.uniform(0.01, 0.03, 1500), 0.05).p_value < 0.05
+        for _ in range(600)
+    ]
+    assert 0.02 < np.mean(rej) < 0.09
+
+
+def test_dq_catches_what_kupiec_and_christoffersen_miss():
+    """Breaches more likely when VaR is LOW, at the right overall rate and without
+    clustering: Kupiec and Christoffersen pass, DQ rejects via the VaR regressor."""
+    from alphalab.backtest import dq_test
+
+    rng = np.random.default_rng(5)
+    n = 4000
+    var = rng.uniform(0.01, 0.03, n)
+    p_hit = np.where(var < 0.02, 0.08, 0.02)  # mean 5%, but depends on the forecast
+    hits = rng.random(n) < p_hit
+    cov = coverage_tests(hits, 0.05)
+    assert cov.p_pof > 0.05 and cov.p_ind > 0.05
+    assert dq_test(hits, var, 0.05).p_value < 1e-6
+
+
+def test_dq_input_checks():
+    from alphalab.backtest import dq_test
+
+    with pytest.raises(ValueError, match="aligned"):
+        dq_test(np.zeros(100, bool), np.ones(99), 0.05)

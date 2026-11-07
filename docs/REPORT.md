@@ -26,8 +26,9 @@ in October 2008 the forest's VaR stayed capped while VIX reached 70. These patte
 across portfolios and estimation windows. **They did not replicate in the lockbox**: in the
 calm 2023–2026 period, feature-based models had lower average loss than FHS-GJR (not
 significant on SPY), while FHS-GJR stayed well calibrated. The evidence supports a
-regime-dependent conclusion. FHS-GJR is the robust choice, best in stress and calibrated
-everywhere, while feature-based ML can reduce average loss in calm markets.
+regime-dependent conclusion. FHS-GJR is the robust choice, best in stress and the
+best-calibrated model (though the stricter Dynamic Quantile test shows its breaches are too
+frequent in calm periods), while feature-based ML can reduce average loss in calm markets.
 
 ---
 
@@ -147,7 +148,8 @@ required an explicit flag.
 ### 4.4 Evaluation
 
 - **Calibration:** Kupiec (frequency), Christoffersen (independence, conditional coverage),
-  Basel traffic light.
+  Engle–Manganelli Dynamic Quantile (DQ: are breaches predictable from past breaches or from
+  the VaR level itself?), Basel traffic light.
 - **ES:** McNeil–Frey exceedance-residual test (bootstrap).
 - **Ranking:** mean FZ0 and tick loss; Diebold–Mariano tests with Newey–West errors; the Model
   Confidence Set (MCS, Hansen, Lunde & Nason 2011) at 90%, the headline comparison because it
@@ -172,7 +174,7 @@ including the rule for "replicated", was pushed to GitHub before the lockbox was
 
 ## 5. Results
 
-### 5.1 Calibration (H1): only FHS-GJR passes everywhere (P1, development)
+### 5.1 Calibration (H1): FHS-GJR is the best-calibrated model (P1, development)
 
 | Model | 1% hits | 2.5% hits | 5% hits | Conditional-coverage p (1 / 2.5 / 5%) |
 |---|---|---|---|---|
@@ -188,8 +190,17 @@ including the rule for "replicated", was pushed to GitHub before the lockbox was
 HS fails through clustered breaches (slow reaction). EWMA tracks volatility, but its normal
 tails are too thin: realized tail losses exceed its ES by 14% at 2.5%. The t-tailed GARCH
 models over-hit because SPY's losses are negatively skewed. FHS, with GJR volatility and
-empirical tails, is the only model not rejected at any level. **H1 is not supported for the
-ML models.**
+empirical tails, is the only model not rejected by Kupiec or Christoffersen at any level.
+**H1 is not supported for the ML models.**
+
+**The stricter DQ test** (implemented after the lockbox was opened, so applied to the
+development samples only) rejects every model, including FHS-GJR on P1 (p = 0.019, 0.002,
+0.011). FHS-GJR is the least-rejected model: rejected in 8 of 12 portfolio × α cells, while
+every other model is rejected in 11 or 12. For FHS-GJR the rejection comes from the VaR
+regressor, not from breach clustering. At 1% its breach rate is 1.50% when its VaR is below
+median and 0.76% when it is above: correct on average, but too aggressive in calm periods and
+too conservative in volatile ones. That is the mirror image of H3: calm markets are where
+FHS-GJR under-forecasts risk and where feature-based models gain.
 
 ### 5.2 Accuracy (H2): no ML model beats FHS-GJR
 
@@ -299,8 +310,9 @@ no stress, so it cannot test stress robustness.
 ## 6. Discussion
 
 **The answer to the research question is regime-dependent.**
-- In crises, the econometric FHS-GJR is clearly superior. It stays calibrated, reacts fastest,
-  and is the only model in the crisis-period MCS.
+- In crises, the econometric FHS-GJR is clearly superior. Its breach rate stays near target
+  in crises, it reacts fastest, and it is the only model in the crisis-period MCS. Its
+  weakness is the opposite regime: in calm periods it breaches too often (DQ test).
 - In calm markets, feature-based models (including a regularized *linear* one) can reduce
   average loss.
 - Over a full cycle that includes crises, nothing beat FHS-GJR in development. In a calm

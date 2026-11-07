@@ -128,7 +128,7 @@ with tabs[0]:
             zerolinecolor=INK,
         )
         st.subheader(f"Joint VaR–ES loss (FZ0) at α = {alpha:.1%}")
-        st.plotly_chart(fig, use_container_width=True, theme="streamlit")
+        st.plotly_chart(fig, width="stretch", theme="streamlit")
         show = h[
             ["label", "mean_fz0", "rank_fz0", "in_mcs_fz0", "mcs_p_fz0", "hit_rate", "p_cc"]
         ].rename(
@@ -152,7 +152,7 @@ with tabs[0]:
                 }
             ),
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
 
 # ---------------------------------------------------------------- forecasts
@@ -217,7 +217,7 @@ with tabs[1]:
                 )
             )
         st.plotly_chart(
-            style(fig, 440, f"Loss / VaR at α = {alpha:.1%}", pct=True), use_container_width=True
+            style(fig, 440, f"Loss / VaR at α = {alpha:.1%}", pct=True), width="stretch"
         )
         st.caption(
             "Dots: realised next-day loss. Lines: VaR forecast made the day before. ✕: a breach (loss > VaR) "
@@ -244,9 +244,16 @@ with tabs[2]:
     else:
         st.subheader("Coverage: are breaches as frequent as α and unclustered?")
         cv = cov[cov.alpha == alpha].sort_values("p_cc", ascending=False)
-        cv = cv.assign(Model=cv.model.map(D.label))[
-            ["Model", "n", "hits", "hit_rate", "p_pof", "p_ind", "p_cc"]
-        ]
+        cols = ["Model", "n", "hits", "hit_rate", "p_pof", "p_ind", "p_cc"]
+        dq = D.table(run, "backtest_dq", lockbox)  # development samples only (RESULTS_LOG)
+        if dq is not None:
+            cv = cv.merge(
+                dq[dq.alpha == alpha][["model", "p_value"]].rename(columns={"p_value": "p_dq"}),
+                on="model",
+                how="left",
+            )
+            cols.append("p_dq")
+        cv = cv.assign(Model=cv.model.map(D.label))[cols]
         st.dataframe(
             cv.rename(
                 columns={
@@ -255,13 +262,22 @@ with tabs[2]:
                     "p_pof": "Kupiec p",
                     "p_ind": "Independence p",
                     "p_cc": "CC p",
+                    "p_dq": "DQ p",
                 }
             ).style.format(
-                {"Hit rate": "{:.2%}", "Kupiec p": fmt_p, "Independence p": fmt_p, "CC p": fmt_p}
+                {
+                    "Hit rate": "{:.2%}",
+                    "Kupiec p": fmt_p,
+                    "Independence p": fmt_p,
+                    "CC p": fmt_p,
+                    "DQ p": fmt_p,
+                }
             ),
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
+        if dq is None and lockbox:
+            st.caption("DQ test: development samples only (added after the lockbox was opened).")
         if es is not None:
             st.subheader(
                 "Expected Shortfall (McNeil–Frey): are tail losses as large as ES predicted?"
@@ -286,7 +302,7 @@ with tabs[2]:
                     }
                 ),
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
             st.caption("Ratio above 1 = ES understates real tail losses (the dangerous direction).")
         if dm is not None:
@@ -325,7 +341,7 @@ with tabs[2]:
             )
             style(fig, 460).update_layout(hovermode="closest")
             fig.update_yaxes(autorange="reversed", gridcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
 # ---------------------------------------------------------------- stress
 with tabs[3]:
@@ -378,7 +394,7 @@ with tabs[3]:
             barmode="group", bargap=0.25, bargroupgap=0.08
         )
         st.subheader(f"Breach rate by regime at α = {alpha:.1%}")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         if ols is not None:
             st.subheader("Loss differential vs FHS-GJR: calm (a) and extra in stress (b)")
             o = ols[(ols.alpha == alpha)].assign(Model=lambda x: x.model.map(D.label))
@@ -403,7 +419,7 @@ with tabs[3]:
                     }
                 ),
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
             st.caption(
                 "Positive = worse than FHS-GJR. A non-significant b is not proof of no stress effect: FZ0 is "
@@ -432,7 +448,7 @@ with tabs[3]:
             )
             style(fig, 360, "VaR relative to k = −5")
             fig.update_xaxes(title="Trading days relative to the large loss")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
 # ---------------------------------------------------------------- explain
 with tabs[4]:
@@ -464,13 +480,13 @@ with tabs[4]:
         )
         fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
         st.subheader("Top-10 permutation importance (mean over yearly refits)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         st.caption("Colour = feature family: " + " · ".join(f"{k}" for k in FAMILY_COLORS))
         if crit is not None:
             st.dataframe(
                 crit[crit.model == m][["criterion", "value", "passed"]],
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
         sh = D.shap_by_family(run, m) if m in ("mlvol_fhs", "gbq") else None
         if sh is not None:
@@ -492,7 +508,7 @@ with tabs[4]:
                     )
             fig.add_hline(y=0, line=dict(color=INK, width=1))
             style(fig, 380, "Push on VaR vs the model's average", pct=True)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             if m == "mlvol_fhs":
                 st.caption(
                     "2008: the model refit in Jan 2008 had seen VIX ≤ 45.7, so its VaR stayed capped near 3.8% while "
@@ -536,7 +552,7 @@ with tabs[5]:
             )
             .style.format({"Hit rate (development)": "{:.2%}", "Hit rate (lockbox)": "{:.2%}"}),
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
         dev_m = D.market_conditions(run, "1997-01-14", "2022-12-29")
         lb_m = D.market_conditions(run, "2023-01-03", "2026-10-30")

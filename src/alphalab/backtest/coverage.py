@@ -118,3 +118,42 @@ def traffic_light(hits_99: np.ndarray, window: int = 250) -> dict[str, float]:
         "max_hits": int(counts.max()),
         "windows": len(counts),
     }
+
+
+@dataclass(frozen=True)
+class DQResult:
+    alpha: float
+    n: int
+    stat: float
+    df: int
+    p_value: float
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def dq_test(hits: np.ndarray, var: np.ndarray, alpha: float, lags: int = 4) -> DQResult:
+    """Engle & Manganelli (2004) Dynamic Quantile test.
+
+    Demeaned hit Hit_t = 1[L_t > VaR_t] − α. Under a correct VaR, Hit_t is unpredictable
+    from anything known when the forecast was made. Regress it on a constant, its own
+    ``lags`` lags and the VaR forecast itself:
+
+        Hit_t = β0 + Σ_k βk Hit_{t−k} + γ VaR_t + u_t
+        DQ = β̂' X'X β̂ / (α(1 − α))  ~  χ²(1 + lags + 1)  under H0
+
+    It nests Kupiec (the constant) and Christoffersen (lag 1), and adds the VaR regressor:
+    it catches breaches that become more likely when VaR is LOW, which neither of the
+    other tests sees.
+    """
+    h = np.asarray(hits, dtype=float) - alpha
+    v = np.asarray(var, dtype=float)
+    if len(h) != len(v) or len(h) <= lags + 10:
+        raise ValueError("hits and var must be aligned, with more than lags + 10 observations")
+    y = h[lags:]
+    cols = [np.ones(len(y))] + [h[lags - k : len(h) - k] for k in range(1, lags + 1)] + [v[lags:]]
+    X = np.column_stack(cols)
+    beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+    stat = float(beta @ (X.T @ X) @ beta / (alpha * (1 - alpha)))
+    df = X.shape[1]
+    return DQResult(alpha=alpha, n=len(y), stat=stat, df=df, p_value=float(stats.chi2.sf(stat, df)))

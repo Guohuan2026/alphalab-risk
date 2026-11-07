@@ -7,6 +7,7 @@ origins. Output tables:
 - es       : McNeil–Frey per model and α
 - losses   : mean tick and FZ0 loss per model and α, with Model Confidence Set membership
 - dm       : pairwise Diebold–Mariano tests on FZ0 per α (A vs B; stat < 0 = A better)
+- dq       : Engle–Manganelli Dynamic Quantile test per model and α
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from alphalab.backtest.compare import diebold_mariano, model_confidence_set
-from alphalab.backtest.coverage import coverage_tests, traffic_light
+from alphalab.backtest.coverage import coverage_tests, dq_test, traffic_light
 from alphalab.backtest.es import mcneil_frey
 from alphalab.backtest.losses import fz0_loss, tick_loss
 
@@ -34,7 +35,7 @@ def evaluate(
     evs: dict[str, pd.DataFrame], alphas, mcs_reps: int = 2000, seed: int = 0
 ) -> dict[str, pd.DataFrame]:
     evs = align(evs)
-    cov, es_rows, loss_rows, dm_rows = [], [], [], []
+    cov, es_rows, loss_rows, dm_rows, dq_rows = [], [], [], [], []
     for a in alphas:
         fz, tk = {}, {}
         for name, ev in evs.items():
@@ -47,6 +48,7 @@ def evaluate(
             if np.isclose(a, 0.01):
                 row |= {f"tl_{k}": v for k, v in traffic_light(hits).items()}
             cov.append(row)
+            dq_rows.append({"model": name, **dq_test(hits, var.to_numpy(), a).to_dict()})
             sigma = ev["sigma"] if ev["sigma"].notna().all() else None
             es_rows.append(
                 {"model": name, **mcneil_frey(loss, var, es, a, sigma, seed=seed).to_dict()}
@@ -92,4 +94,5 @@ def evaluate(
         "es": pd.DataFrame(es_rows),
         "losses": losses,
         "dm": pd.DataFrame(dm_rows),
+        "dq": pd.DataFrame(dq_rows),
     }
