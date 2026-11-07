@@ -354,3 +354,29 @@ Format: date · section · change · reason · made before/after seeing affected
    - *Reaction speed:* event study around the 1% largest realised losses in the sample
      (target days). Each model's VaR_1% path from 5 sessions before to 20 after, divided by
      its value 5 sessions before. Summarised by days until VaR first reaches 1.5× that level.
+
+5. **2026-11-06 · §2 (H4), §7 · Clarification (not a change): testable H4 rules.** Written
+   **before any importance or SHAP value was computed on real data** (only a speed and
+   additivity probe on P1 features, with no numbers inspected beyond timing and error).
+   - *Models:* the three ML models. SHAP (TreeSHAP) for `mlvol_fhs` (the forest's scale
+     prediction; VaR = σ̃·q is linear in it, so VaR attributions = q × scale attributions)
+     and `gbq` at α = 1% (the 1% quantile model; VaR attributions = −SHAP). Not for `qrf`:
+     TreeSHAP explains a forest's mean, not its quantiles. `qrf` gets permutation importance
+     only.
+   - *Permutation importance:* at every yearly refit, the chosen configuration is fitted on
+     the tuning part and each feature is permuted on the validation part (5 repeats,
+     seed 0). Importance = rise in mean tick loss over the VaR levels.
+   - *Feature families:* volatility = {rv_1, rv_5, rv_22, rv_66, abs_ret, pk_1, gk_1, gk_5,
+     gk_22}; VIX = {vix, vix_chg_5}; credit = {baa10y, baa10y_chg_22}; other = {ret,
+     dd_252, t10y3m, t10y3m_chg_22}.
+   - *H4 criteria* (all three needed for "supported"; each reported separately):
+     (C1) concentration: the top-3 features by mean permutation importance (averaged over
+     refits) are all volatility or VIX features;
+     (C2) economic sign: for every volatility and VIX feature, the correlation between the
+     feature's value and its SHAP contribution to VaR is positive (higher volatility or VIX
+     → higher VaR) for `mlvol_fhs` and `gbq`;
+     (C3) stability: the median Spearman rank correlation of permutation-importance vectors
+     between consecutive refits is ≥ 0.6.
+   - *Descriptive (not tests):* SHAP decomposition of VaR around 2008-09/10 and
+     2020-02/03; the linear control's coefficient paths and the GARCH parameter paths for
+     comparison.
