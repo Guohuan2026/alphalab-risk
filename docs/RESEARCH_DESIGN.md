@@ -331,3 +331,26 @@ Format: date · section · change · reason · made before/after seeing affected
        limit the number of compared models.
    - *ES:* QRF and boosting average quantiles at α(k−½)/K, K = 5 (as the control);
      quantiles sorted across levels. The 1 bp floor applies.
+
+4. **2026-11-06 · §7 · Clarification (not a change): exact stress-analysis rules.** Written
+   **before any stress-period statistic was computed**. The P1 full-sample results
+   (RESULTS_LOG) had been seen; per-regime numbers had not.
+   - *Episodes* (inclusive; a forecast belongs to an episode if its **target date**, the day
+     whose loss it forecasts, falls inside): LTCM 1998-08-01 → 1998-10-31; dot-com
+     2000-03-01 → 2002-10-31; GFC 2007-07-01 → 2009-03-31; euro crisis 2011-07-01 →
+     2011-10-31; Aug 2015 2015-08-01 → 2015-08-31; Q4 2018 2018-10-01 → 2018-12-31;
+     COVID 2020-02-20 → 2020-04-30; 2022 rate shock 2022-01-01 → 2022-10-31 (the S&P 500
+     peak-to-trough window, which the design left unspecified).
+   - *VIX regime:* VIX at the forecast **origin** > 30 (known at t). Portfolios without a
+     VIX feature skip it.
+   - *Benchmark for regime DM tests and loss-differential regressions:* FHS-GJR, the
+     best full-sample econometric model. Regression: d_t = L_model,t − L_FHS,t =
+     a + b·D_t + e_t with Newey–West standard errors (default lag); H3 is tested by b
+     (b > 0: the model loses ground in stress). Losses: FZ0 at each α.
+   - *Reported per regime* (calm, pooled episodes, each episode, VIX > 30, VIX ≤ 30): n,
+     expected and observed hits, Kupiec p, mean FZ0, ES severity, and an MCS on the pooled
+     episodes and on VIX > 30. Expected hits are shown so that under-powered cells (e.g.
+     COVID at 1%: 0.5 expected) are visible, not over-read.
+   - *Reaction speed:* event study around the 1% largest realised losses in the sample
+     (target days). Each model's VaR_1% path from 5 sessions before to 20 after, divided by
+     its value 5 sessions before. Summarised by days until VaR first reaches 1.5× that level.
