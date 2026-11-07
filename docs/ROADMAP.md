@@ -41,7 +41,7 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 12. ✅ Lockbox opened once (2026-11-07; protocol pushed first): the development headline was
     NOT replicated in the calm 2023–26 period (docs/RESULTS_LOG.md).
 13. ✅ Streamlit dashboard (`make dashboard`; reads saved results; no model fitting in the app).
-14. Research report (proposal format for supervisor / Mitacs) and a clean-clone reproducibility run.
+14. ✅ Research report draft v1 (`docs/REPORT.md`) and clean-clone reproducibility run (bit-identical).
 
 ## Later / partner-dependent
 - CRSP or partner P&L via the provider interface; multivariate models (DCC-GARCH, copulas);

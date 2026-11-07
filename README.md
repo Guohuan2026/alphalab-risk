@@ -11,6 +11,7 @@ ML-volatility hybrids on 1-day VaR and Expected Shortfall. Every model is backte
 out-of-sample (Kupiec, Christoffersen, DQ, ES tests, FZ0 loss, Diebold–Mariano, Model
 Confidence Set) with a focus on stress periods.
 
+- **Research report (start here): [docs/REPORT.md](docs/REPORT.md)**
 - Research design, hypotheses and leakage safeguards: **[docs/RESEARCH_DESIGN.md](docs/RESEARCH_DESIGN.md)**
 - Plan: **[docs/ROADMAP.md](docs/ROADMAP.md)**
 - Results, in the order they were seen: **[docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)**
@@ -39,7 +40,7 @@ cells; ML always loses ground in stress. **Lockbox 2023–26 (opened once): not 
 In that calm period feature-based models had lower average loss (not significant on SPY),
 while FHS-GJR stayed calibrated. Conclusion: regime-dependent, with FHS-GJR the robust
 choice. A fresh clone from GitHub
-reproduces P1 bit-for-bit (locked environment, `requirements-lock.txt`). Next: write-up. The Python package and CLI are still called `alphalab`.
+reproduces P1 bit-for-bit (locked environment, `requirements-lock.txt`). Research report: draft v1. The Python package and CLI are still called `alphalab`.
 
 *History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
 returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is
