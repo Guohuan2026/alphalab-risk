@@ -398,3 +398,62 @@ P1 −0.067 (p 0.0008); P2 −0.043 (p 0.046); P3 −0.006 (p 0.68); rolling −
   *not replicated*.
 - **Not done:** no stress-episode analysis inside the lockbox. Clarification 4 defined no
   lockbox episodes (e.g. the April 2025 tariff shock), and defining one now would be post hoc.
+
+---
+
+## 2026-11-07 — LOCKBOX RESULTS (opened once; protocol `dc8af86`, pushed 15:28 UTC)
+
+Runs: P1, P2, P3 with `--include-lockbox`, frozen code `2cba50d` + protocol commit.
+**Integrity: for all three portfolios, the development-period forecasts in the lockbox run
+are bit-identical to the saved development forecasts.** ~961 lockbox forecasts per model
+(targets 2023-01-03 → 2026-10-30); no floored forecasts.
+
+**Pre-stated rule** (FHS-GJR in MCS at 2.5% and 5%, AND neither QRF nor GBQ has lower mean
+FZ0): **NOT REPLICATED in P1, P2 or P3.** GBQ has lower mean FZ0 than FHS-GJR in all three;
+QRF does in P1 and P2. FHS-GJR is in the MCS at 2.5% and 5% in P1 and P3, but not at 2.5% in P2.
+
+**P1 (headline), FZ0 rank of 11 and MCS:**
+
+| Model | 1% rank | 2.5% rank | 5% rank | Hit rates (1 / 2.5 / 5%) |
+|---|---|---|---|---|
+| linqr_l1 (control) | 1 | 1 | 1 | 0.73% / 1.56% / 4.37% |
+| Gradient boosting | 3 | 2 | 2 | 1.35% / 2.50% / 5.20% |
+| ML-vol + FHS | 2 | 3 | 3 | 1.14% / 2.50% / 4.16% |
+| QRF | 7 | 4 | 4 | 0.83% / 1.56% / 3.95% |
+| FHS-GJR | 5 (MCS) | 6 (MCS) | 5 (MCS) | **1.04% / 1.98% / 4.79%** (CC p 0.89 / 0.37 / 0.63) |
+| GJR-t | 6 | 7 | 7 | 1.56% / 2.71% / 6.14% |
+| EWMA, HS | 9–11 | 9–11 | 9–11 | |
+
+DM (FZ0), FHS-GJR vs: linqr_l1 p = 0.12 / **0.037** / 0.081 (the control is better at 2.5%);
+GBQ p = 0.65 / 0.11 / 0.15; ML-vol p = 0.25 / 0.13 / 0.065; QRF p = 0.50 / 0.57 / 0.16.
+On P1 the ML models are better on average but **not significantly**, with ~10–48 expected
+hits.
+
+**P2:** GBQ / ML-vol / linqr_l1 rank 1–3; FHS-GJR 5–6 (outside the MCS at 2.5%). ML better
+than FHS-GJR significantly in places (ML-vol p = 0.030 / 0.011 / 0.052; GBQ p = 0.015 at 1%).
+**P3:** almost every model in the MCS; GBQ rank 1–2; FHS-GJR 3–5; the only significant DM is
+FHS-GJR beating QRF at 5% (p = 0.022).
+
+**Market conditions (descriptive):** lockbox mean VIX 17.4 vs 20.6 in development; VIX > 30
+on 1.6% of days vs 10.5%; annualised SPY volatility 14.9% vs 19.9%; 4 days with |r| > 4% vs
+86; worst day −5.85% (2025-04-04).
+
+**Reading:**
+1. **The development-sample headline does not carry over to 2023–2026.** In the lockbox,
+   feature-based models (the lasso control, boosting, the RF-volatility hybrid) have lower
+   average FZ0 than FHS-GJR. On the headline portfolio the differences are not significant;
+   on P2 some are.
+2. **What did hold:** FHS-GJR stayed well calibrated in all three portfolios (P1 CC p ≥ 0.37)
+   and remained in the MCS in 7 of 9 (portfolio × α) cells. HS and EWMA stayed near the
+   bottom. Nothing in the pipeline changed (bit-identical development forecasts).
+3. **A possible explanation, stated as post hoc and untested:** the lockbox was unusually
+   calm (VIX > 30 on 1.6% of days), and the development sample found feature-based models
+   *better in calm periods and worse in stress* (H3). The lockbox reversal is consistent with
+   that pattern, but this reading was formed after seeing the result. Confirming it would need
+   a new pre-specified test on new data. The lockbox itself contains almost no stress (one
+   episode, April 2025), so it cannot test stress robustness.
+4. **Implication for the overall conclusion:** "econometric models dominate" is
+   regime-dependent, not a general law. The defensible statement is: FHS-GJR is the most
+   *robust* choice (calibrated in every period and portfolio, and best in stress), while
+   feature-based ML can have lower average loss in calm periods. Which is better depends on
+   how much weight the user puts on stress performance.

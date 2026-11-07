@@ -22,7 +22,10 @@ deep tail. Stress analysis (H3): FHS-GJR alone stays calibrated in crises; the M
 is better in calm markets but worse in stress. Interpretability (H4): ML relies on VIX and
 range volatility, but signs and rankings are unstable, and trees saturate beyond their training
 range (2008). Robustness (P2 60/40, P3 Canada, rolling window): FHS-GJR first in 11 of 12
-cells; ML always loses ground in stress. Next: lockbox, dashboard, write-up. The Python package and CLI are still called `alphalab`.
+cells; ML always loses ground in stress. **Lockbox 2023–26 (opened once): not replicated.**
+In that calm period feature-based models had lower average loss (not significant on SPY),
+while FHS-GJR stayed calibrated. Conclusion: regime-dependent, with FHS-GJR the robust
+choice. Next: dashboard and write-up. The Python package and CLI are still called `alphalab`.
 
 *History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
 returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is
