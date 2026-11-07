@@ -18,6 +18,7 @@ import pandas as pd
 import alphalab
 from alphalab.backtest.report import evaluate
 from alphalab.config import Config
+from alphalab.data.corrections import apply_corrections
 from alphalab.data.providers import get_provider
 from alphalab.data.providers.fred import FredSource
 from alphalab.data.providers.yahoo import YahooProvider
@@ -103,6 +104,9 @@ def run_build(cfg: Config, snapshot_id: str = "latest", force: bool = False) -> 
         snapshot_id = store.latest(cfg.provider, snapshot_request(cfg))
     prices, manifest = store.load(cfg.provider, snapshot_id)
     basis = manifest["provider"]["price_basis"]
+    prices, corrections_log = apply_corrections(prices, cfg.corrections)
+    for c in corrections_log:
+        log.info("correction: %s", c)
 
     report = validate_prices(prices, basis, calendar=cfg.calendar, **asdict(cfg.validation))
     log.info(report.summary())
@@ -151,6 +155,7 @@ def run_build(cfg: Config, snapshot_id: str = "latest", force: bool = False) -> 
                 "monthly_min_obs": cfg.monthly_min_obs,
                 "calendar": cfg.calendar,
                 "portfolio": port_info,
+                "corrections_applied": corrections_log,
                 "features": feat_info,
                 "outputs": sorted(p.name for p in out.iterdir()),
             },
@@ -203,6 +208,8 @@ def _processed_dir(cfg: Config) -> Path:
 
 def _results_dir(cfg: Config, proc: Path) -> Path:
     out = cfg.data_dir / "results" / cfg.portfolio.name / proc.name
+    if cfg.risk is not None and cfg.risk.run_tag:
+        out = out / cfg.risk.run_tag  # robustness runs never overwrite the main results
     out.mkdir(parents=True, exist_ok=True)
     return out
 

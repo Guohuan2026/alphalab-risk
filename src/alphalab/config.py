@@ -74,6 +74,7 @@ class RiskConfig:
     lockbox_start: str | None = None  # first TARGET date held out until the end
     var_floor: float = 1e-4  # VaR >= 1 bp, ES >= VaR for every model (Deviation 2)
     benchmark: str | None = None  # reference model for stress DM/regressions (Clarification 4)
+    run_tag: str | None = None  # separate results folder for robustness runs (e.g. rolling)
     models: list[dict] = field(default_factory=_default_models)
 
     def __post_init__(self):
@@ -118,6 +119,7 @@ class Config:
     portfolio: PortfolioConfig | None = None
     features: FeaturesConfig | None = None
     risk: RiskConfig | None = None
+    corrections: dict = field(default_factory=dict)  # explicit data fixes (data/corrections.py)
 
     def __post_init__(self):
         if not self.universe:

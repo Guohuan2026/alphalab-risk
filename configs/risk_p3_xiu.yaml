@@ -50,3 +50,6 @@ risk:                    # docs/RESEARCH_DESIGN.md §4-5; `alphalab forecast` th
     - {type: qrf}          # quantile regression forest
     - {type: gbq}          # gradient boosting, quantile loss (XGBoost unavailable: libomp)
     - {type: mlvol}        # random-forest volatility + out-of-bag FHS tails
+corrections:             # applied at build; data/raw untouched (docs/LIMITATIONS.md #12)
+  non_cash_dividends:    # reinvested year-end distributions: Yahoo's adjusted close implies
+    XIU.TO: ["2000-12-27", "2003-12-29", "2004-12-29"]   # no payout; no price drop

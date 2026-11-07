@@ -380,3 +380,16 @@ Format: date · section · change · reason · made before/after seeing affected
    - *Descriptive (not tests):* SHAP decomposition of VaR around 2008-09/10 and
      2020-02/03; the linear control's coefficient paths and the GARCH parameter paths for
      comparison.
+
+6. **2026-11-06 · §3, §4 · Clarification (not a change): robustness runs.** Written before
+   any P2, P3 or rolling-window forecast was produced.
+   - *P3 data correction* (resolving LIMITATIONS #12 by the cross-check named there in
+     advance): 3 of XIU.TO's 107 distributions (2000-12-27, 2003-12-29, 2004-12-29) are
+     treated as non-cash. These are exactly the dividend dates on which Yahoo's own adjusted
+     close implies no payout and the validation flags `vendor_adj_mismatch`. Applied at build
+     from an explicit list in the config; `data/raw` untouched; logged in the build manifest.
+   - *Rolling window:* P1 re-run with a rolling 1,000-session estimation window
+     (`configs/risk_p1_spy_rolling.yaml`), everything else identical, results in a separate
+     folder (`run_tag`).
+   - *Reading rule:* robustness results are reported next to the main ones; the headline
+     conclusions stay those of P1 with the expanding window (§7, multiple testing).

@@ -45,7 +45,8 @@ they can distort conclusions.
     to 59 days a year differing by more than 0.5%. Cause not yet established (closing-time
     differences or stale index prints are candidates). Because daily risk forecasts are
     sensitive to this, P1 models will also be run on `^SP500TR` as a robustness check.
-12. **XIU.TO year-end reinvested distributions (open, blocks P3).** Some December
+12. **XIU.TO year-end reinvested distributions (resolved 2026-11-06, Clarification 6: 3 dates
+    corrected at build).** Some December
     "dividends" (e.g. $0.46 on 2000-12-27, 3.5% of price) come with no price drop. That is
     typical of reinvested (non-cash) distributions with unit consolidation. Treating them
     as cash creates fake gains (+3.8% that day). Must be resolved, for example by
