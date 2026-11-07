@@ -33,7 +33,7 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
    + FHS hybrid, with the same yearly tuning (Deviation 3).
 9. ✅ Stress analysis: ex-ante episodes, VIX > 30 regime, loss-differential regressions,
    reaction-speed event study (Clarification 4).
-10. SHAP and permutation importance; importance stability across refits.
+10. ✅ SHAP and permutation importance; importance stability across refits (Clarification 5).
 
 ## Week 4 — Robustness, dashboard, write-up
 11. Robustness: rolling vs expanding window, P2 and P3, α = 2.5% *(stretch: Acerbi–Szekely Z2, h = 10)*.

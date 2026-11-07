@@ -14,6 +14,7 @@ from alphalab.pipeline import (
     ValidationFailed,
     run_backtest,
     run_build,
+    run_explain,
     run_forecast,
     run_ingest,
     run_ingest_features,
@@ -33,6 +34,10 @@ def main(argv: list[str] | None = None) -> int:
         ("forecast", "walk-forward VaR/ES forecasts for every model in the 'risk' section"),
         ("backtest", "coverage tests (Kupiec, Christoffersen, traffic light) on saved forecasts"),
         ("stress", "H3: performance by stress regime, DM/HAC tests vs the benchmark, event study"),
+        (
+            "explain",
+            "H4: permutation importance, SHAP and the Clarification-5 criteria (ML models)",
+        ),
     ]:
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("--config", required=True, help="path to YAML config")
@@ -85,6 +90,11 @@ def main(argv: list[str] | None = None) -> int:
         with pd.option_context("display.width", 120, "display.float_format", "{:.4g}".format):
             print(t["regression"].to_string(index=False))
             print(t["event_summary"].to_string(index=False))
+    elif args.command == "explain":
+        t = run_explain(cfg)
+        with pd.option_context("display.width", 140, "display.max_colwidth", 80):
+            print(t["criteria"].to_string(index=False))
+            print(t["check"].to_string(index=False))
     elif args.command == "snapshots":
         for s in RawSnapshotStore(cfg.data_dir).list(cfg.provider):
             print(s)

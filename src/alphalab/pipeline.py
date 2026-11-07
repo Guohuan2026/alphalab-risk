@@ -328,3 +328,59 @@ def run_stress(cfg: Config) -> dict[str, pd.DataFrame]:
         table.to_csv(out / f"stress_{key}.csv", index=False)
     log.info("wrote stress tables to %s", out)
     return tables
+
+
+ML_TYPES = ("qrf", "gbq", "mlvol")
+
+
+def run_explain(cfg: Config) -> dict[str, pd.DataFrame]:
+    """H4 interpretability for the ML models -> explain_*.csv / .parquet (Clarification 5)."""
+    from alphalab.explain import explain_model, h4_criteria
+
+    if cfg.risk is None:
+        raise ValueError("config has no 'risk' section")
+    specs = [s for s in cfg.risk.models if s.get("type") in ML_TYPES]
+    if not specs:
+        raise ValueError(f"no ML models ({', '.join(ML_TYPES)}) in risk.models")
+    proc = _processed_dir(cfg)
+    out = _results_dir(cfg, proc)
+    ret = pd.read_parquet(proc / "portfolio_daily.parquet")["ret"]
+    feats = pd.read_parquet(proc / "features_daily.parquet")
+    saved = None
+    if (out / "forecasts.parquet").exists():
+        saved = pd.read_parquet(out / "forecasts.parquet")
+    perm_all, crit_all, sign_all, checks = [], [], [], []
+    settings = cfg.risk.engine()
+    for spec in specs:
+        name = cfg.risk.model(spec).name
+        ex = explain_model(ret, feats, lambda spec=spec: cfg.risk.model(spec), settings)
+        perm_all.append(ex["permutation"].assign(model=name))
+        shap = ex.get("shap")
+        crit, signs = h4_criteria(ex["permutation"], shap, feats)
+        crit_all.append(crit.assign(model=name))
+        sign_all.append(signs.assign(model=name))
+        if shap is not None:
+            shap.to_parquet(out / f"explain_shap_{name}.parquet")
+            if saved is not None:  # do the explained models reproduce the forecasts?
+                a = min(cfg.risk.alphas)
+                fc = saved[saved["model"] == name][f"var_{a:g}"].reindex(shap.index)
+                diff = (shap["var_shap"] - fc).abs()
+                checks.append(
+                    {
+                        "model": name,
+                        "n": len(diff),
+                        "share_identical": float((diff < 1e-10).mean()),
+                        "max_abs_diff": float(diff.max()),
+                        "note": "differences = quantile-crossing fix (gbq) or floor",
+                    }
+                )
+    tables = {
+        "permutation": pd.concat(perm_all, ignore_index=True),
+        "criteria": pd.concat(crit_all, ignore_index=True),
+        "signs": pd.concat(sign_all, ignore_index=True),
+        "check": pd.DataFrame(checks),
+    }
+    for key, table in tables.items():
+        table.to_csv(out / f"explain_{key}.csv", index=False)
+    log.info("wrote explain tables to %s", out)
+    return tables

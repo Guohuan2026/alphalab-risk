@@ -325,3 +325,27 @@ flagged and scored, never dropped, so all models stay on the same dates.
 - **Event study:** the 1% largest losses; VaR path k = −5..20 relative to k = −5; the
   committed summary is "days to 1.5×". Because large losses usually strike when VaR is
   already elevated, the k = 1 and k = 5 ratios are reported too, as extra description.
+
+## 15. Interpretability (H4) (`explain/importance.py`; rules: Clarification 5)
+
+- **Permutation importance:** at each yearly refit, the chosen configuration is refitted on
+  the tuning part and each feature is shuffled on the validation part (5 repeats). The
+  rise in mean tick loss is that feature's importance, measured out of sample for the model
+  being scored. It answers: "how much worse do forecasts get without this information?"
+- **TreeSHAP** (Lundberg & Lee): an exact decomposition of a tree model's prediction into
+  a base value plus one contribution per feature, with base + contributions = prediction
+  (tested to 1e-9). For the RF-volatility hybrid, VaR = q·σ̃ is linear in the forest's
+  prediction, so VaR contributions = q × SHAP. For boosting, SHAP explains the *raw* 1%
+  quantile model; the reported VaR differs on days where the per-level models cross and
+  are sorted. The explain run reports that share. TreeSHAP cannot explain the quantile
+  forest's quantiles (it explains a forest's mean), so QRF gets permutation importance only.
+- **Same models as the forecasts:** the explain pass refits on the engine's schedule;
+  refits are bit-identical, and `explain_check.csv` compares the SHAP-implied VaR with the
+  saved forecasts.
+- **Criteria (fixed before results):**
+  - C1: the top-3 features by mean permutation importance are volatility or VIX features.
+  - C2: every volatility/VIX feature's SHAP contribution rises with its value.
+  - C3: median Spearman rank correlation of importances between consecutive refits ≥ 0.6.
+- **Caveat:** importance is not causation. Correlated features (rv_5, rv_22, gk_22) share
+  credit: permuting one while its twins remain understates the family's importance. That is
+  why C1 is stated at the family level.

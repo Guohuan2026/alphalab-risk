@@ -93,11 +93,15 @@ class _TunedFeatureModel(RiskModel):
             raise ValueError(f"{self.name}: only {ok.sum()} complete training rows")
         return Xs[ok], y[ok]
 
+    def _split(self, n: int) -> tuple[int, int]:
+        """(n_fit, n_val): tuning part, then embargo, then validation part."""
+        n_val = int(n * self.val_frac)
+        return n - n_val - self.embargo, n_val
+
     def fit(self, train: np.ndarray, X: pd.DataFrame):
         self.cols = list(self.features) if self.features is not None else list(X.columns)
         Xs, y = self._pairs(train, X)
-        n_val = int(len(y) * self.val_frac)
-        n_fit = len(y) - n_val - self.embargo
+        n_fit, n_val = self._split(len(y))
         self.val_losses = []
         best, best_loss = self.grid[0], np.inf
         for cfg in self.grid:
@@ -110,6 +114,45 @@ class _TunedFeatureModel(RiskModel):
         self.best = best
         self._obj = self._fit_one(best, Xs, y, self.levels)
         return self
+
+    # ---------- interpretability (H4, Clarification 5) ----------
+    def permutation_importance(
+        self, train: np.ndarray, X: pd.DataFrame, repeats: int = 5, seed: int = 0
+    ) -> pd.DataFrame:
+        """Rise in validation tick loss when one feature is shuffled.
+
+        Uses exactly the tuning split of ``fit``: the chosen configuration is fitted on the
+        tuning part and scored on the validation part, so the importance is out-of-sample
+        for the model being scored. Call after ``fit`` (needs the chosen configuration)."""
+        if not self.best:
+            raise RuntimeError("call fit() before permutation_importance()")
+        Xs, y = self._pairs(train, X)
+        n_fit, n_val = self._split(len(y))
+        obj = self._fit_one(self.best, Xs[:n_fit], y[:n_fit], self.alphas)
+        Xv, yv = Xs[-n_val:], y[-n_val:]
+
+        def score(Xm):
+            var = self._var(obj, Xm)
+            return float(np.mean([tick_loss(yv, var[a], a).mean() for a in self.alphas]))
+
+        base = score(Xv)
+        rng = np.random.default_rng(seed)
+        rows = []
+        for j, col in enumerate(self.cols):
+            rises = []
+            for _ in range(repeats):
+                Xp = Xv.copy()
+                Xp[:, j] = rng.permutation(Xp[:, j])
+                rises.append(score(Xp) - base)
+            rows.append(
+                {"feature": col, "importance": float(np.mean(rises)), "std": float(np.std(rises))}
+            )
+        return pd.DataFrame(rows)
+
+    def shap_var(self, X: pd.DataFrame, alpha: float) -> tuple[np.ndarray, np.ndarray]:
+        """(base value, per-feature contributions) to VaR_alpha for each row: TreeSHAP,
+        exact additivity, so base + contributions.sum(1) equals the model's VaR."""
+        raise NotImplementedError(f"{self.name}: TreeSHAP does not explain this model")
 
     def fit_info(self) -> dict:
         info = {f"cfg_{k}": v for k, v in self.best.items()}
@@ -220,6 +263,14 @@ class GradientBoostingQuantile(_TunedFeatureModel):
         Q = np.column_stack([obj[float(t)].predict(X) for t in self.levels])
         return self._quantile_forecasts(Q)
 
+    def shap_var(self, X, alpha):
+        import shap
+
+        model = self._obj[float(alpha)]
+        e = shap.TreeExplainer(model)
+        sv = e.shap_values(X[self.cols].to_numpy(dtype=float))
+        return np.full(len(X), -float(np.ravel(e.expected_value)[0])), -sv  # VaR = −quantile
+
 
 @dataclass
 class MLVolFHS(_TunedFeatureModel):
@@ -265,6 +316,14 @@ class MLVolFHS(_TunedFeatureModel):
     def _var(self, obj, X):
         s = self._sigma(obj, X)
         return {a: s * obj["tail"][a][0] for a in self.alphas}
+
+    def shap_var(self, X, alpha):
+        import shap
+
+        q = self._obj["tail"][alpha][0]
+        e = shap.TreeExplainer(self._obj["rf"])
+        sv = e.shap_values(X[self.cols].to_numpy(dtype=float))
+        return np.full(len(X), q * float(np.ravel(e.expected_value)[0])), q * sv  # VaR = q·σ̃
 
     def _forecasts(self, obj, X):
         s = self._sigma(obj, X)

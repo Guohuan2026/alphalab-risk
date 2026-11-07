@@ -19,7 +19,9 @@ backtested on SPY 1997–2022 (see [docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)).*
 backtested on SPY 1997–2022: no ML model beats FHS-GJR; the RF-volatility + FHS hybrid ties
 with it; direct-quantile ML (QRF, boosting) is worse even than the linear control in the
 deep tail. Stress analysis (H3): FHS-GJR alone stays calibrated in crises; the ML hybrid
-is better in calm markets but worse in stress. Next: interpretability (H4). The Python package and CLI are still called `alphalab`.
+is better in calm markets but worse in stress. Interpretability (H4): ML relies on VIX and
+range volatility, but signs and rankings are unstable, and trees saturate beyond their training
+range (2008). Next: week 4 (robustness, lockbox, dashboard, write-up). The Python package and CLI are still called `alphalab`.
 
 *History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
 returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is

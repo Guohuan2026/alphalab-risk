@@ -278,3 +278,51 @@ before; k = 1 is the first forecast after the loss):
   but an econometric model must govern in stress, e.g. a regime switch on VIX or a
   max(ML, GARCH) rule. That rule is a hypothesis for future work, not tested here (it
   would be a post-hoc model).
+
+---
+
+## 2026-11-06 — Interpretability (H4), P1 (SPY), development sample
+
+Criteria fixed and committed before any importance value (Clarification 5, commit
+`2bb1d58`). 26 yearly refits per model; permutation importance on each validation window
+(5 repeats); TreeSHAP for every out-of-sample forecast of `mlvol_fhs` and `gbq` (1%).
+
+**Same models as the forecasts?** `mlvol_fhs`: the SHAP-implied VaR equals the saved
+forecasts on 100% of 6,535 days (max difference 2e-16). `gbq`: identical on only **34%** of
+days. On the other 66% the separately fitted per-level quantile models crossed and the
+sorting fix changed the reported 1% VaR (by up to 1.0 percentage point). SHAP explains
+boosting's raw 1% model, not its reported VaR on those days.
+
+**Pre-registered criteria**
+
+| Model | C1 top-3 vol/VIX | C2 economic sign | C3 stability ≥ 0.6 | H4 |
+|---|---|---|---|---|
+| ML-vol + FHS | ✅ vix, gk_5, gk_1 | ❌ 9/11 positive (abs_ret −0.56, rv_1 −0.28) | ❌ 0.544 | not supported |
+| QRF | ✅ gk_5, vix, pk_1 | n/a (no SHAP) | ❌ 0.348 | not supported |
+| Gradient boosting | ❌ gk_5, vix, baa10y_chg_22 (credit) | ❌ 8/11 (abs_ret −0.56, rv_22 −0.17; rv_1 unused → undefined) | ✅ 0.691 | not supported |
+
+(For boosting, `rv_1` is never used, so its SHAP values are all zero and the correlation is
+undefined, counted as not positive per the rule. Excluding it would not change the result:
+two negative signs remain.)
+
+**What the models rely on.** Share of positive permutation importance: volatility 46–59%,
+VIX 18–44%, credit 2–14%, other 9–14%. The hybrid relies most on VIX (vix + vix_chg_5 = 44%)
+and range-based volatility (gk_5, gk_1). The return-based HAR features (rv_*) matter much
+less than the range-based ones.
+
+**Why ML fails in stress, shown directly (descriptive).** The hybrid's model used through
+2008 (refit 2008-01-22) had seen VIX at most 45.7 in training. Its 1% VaR was 3.81% on
+2008-09-12 (VIX 25.7) and 3.82% on 2008-10-10 (VIX 69.9), with identical SHAP
+contributions: both days fall in the same leaves, so the forest is **saturated**. FHS-GJR
+moved from 4.12% to 11.73%; QRF from 3.27% to 3.18%. In March 2020, after training on
+2008 (max VIX 80.9), the hybrid reached 11.19% (FHS-GJR 19.81%). A tree model cannot
+forecast a risk level outside the range of its training outcomes; GARCH extrapolates through
+its recursion. This is the mechanism behind the H3 result.
+
+**Reading:** H4 is **not supported** under the pre-stated all-three rule for any model.
+The *direction* is economically sensible (VIX and range volatility dominate; VIX's
+contribution rises with its level, correlation 0.79–0.87). But (i) SHAP signs for correlated
+volatility features are not reliable (|r| gets a negative sign once range volatility is
+included), and (ii) importance rankings shift a lot from year to year (median Spearman
+0.35–0.69). For model validation, the explanations are suggestive, not stable enough to
+govern a model.
