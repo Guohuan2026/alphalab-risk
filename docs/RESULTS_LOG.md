@@ -326,3 +326,48 @@ volatility features are not reliable (|r| gets a negative sign once range volati
 included), and (ii) importance rankings shift a lot from year to year (median Spearman
 0.35–0.69). For model validation, the explanations are suggestive, not stable enough to
 govern a model.
+
+---
+
+## 2026-11-07 — Robustness: P2 (60/40), P3 (Canada), P1 rolling window
+
+Specification committed before any of these forecasts (Clarification 6, commit `b7ab38d`).
+P3 built with the 3 XIU.TO non-cash corrections (logged in the build manifest; remaining
+warning: the 2001-09-11 partial TSX session). Same 11 models, same rules, dev sample only.
+
+| Setting | Forecasts | FHS-GJR FZ0 rank (1/2.5/5%) | FHS-GJR CC p (1/2.5/5%) | RF-vol + FHS rank | QRF / GBQ ranks |
+|---|---|---|---|---|---|
+| **P1 SPY, expanding (main)** | 6,535 (1997–2022) | 1 / 1 / 2 | 0.32 / 0.15 / 0.36 | 2 / 2 / 1 | 9,8,7 / 10,9,8 |
+| P2 60/40 balanced | 4,142 (2006–2022) | 1 / 1 / 1 | **0.027** / 0.36 / 0.27 | 6 / 7 / 7 | 10,9,8 / 11,11,10 |
+| P3 XIU.TO (CAD) | 4,838 (2003–2022) | 1 / 1 / 1 | 0.15 / 0.46 / 0.86 | 5 / 3 / 3 | 8,9,9 / 9,8,8 |
+| P1 rolling 1,000 | 6,535 (1997–2022) | 1 / 1 / 1 | 0.31 / 0.48 / 0.40 | 5 / 5 / 5 | 10,10,8 / 11,11,11 |
+
+MCS (FZ0): FHS-GJR is in the MCS in every setting at every level; it is the **sole** member
+at 2.5% and 5% in the rolling run, and at 2.5% in P2.
+
+**Stress shift vs FHS-GJR** (episode dummy, FZ0, α = 2.5%; b > 0 = loses ground in stress):
+
+| Model | P1 | P2 | P3 | P1 rolling |
+|---|---|---|---|---|
+| RF-vol + FHS | +0.31 (p 0.008) | +0.98 (0.006) | +0.27 (0.023) | +0.50 (0.020) |
+| QRF | +0.43 (0.010) | +1.34 (0.003) | +0.60 (0.028) | +0.75 (0.009) |
+| Gradient boosting | +0.55 (0.002) | +2.06 (0.0002) | +0.53 (0.003) | +1.16 (0.0006) |
+| linqr_l1 | +0.27 (0.002) | +0.80 (0.002) | −0.06 (0.40) | +0.60 (0.002) |
+| GJR-t | +0.03 (0.094) | +0.09 (0.002) | +0.06 (0.015) | +0.04 (0.087) |
+
+**Calm-period difference, RF-vol vs FHS-GJR** (a < 0 = hybrid better in calm; α = 2.5%):
+P1 −0.067 (p 0.0008); P2 −0.043 (p 0.046); P3 −0.006 (p 0.68); rolling −0.021 (p 0.31).
+
+**Reading:**
+- **Robust across all four settings:** FHS-GJR ranks first on FZ0 at 11 of 12
+  (setting × α) cells and is always in the MCS. No ML model beats it (H2a not supported
+  anywhere). Direct-quantile ML (QRF, boosting) is always in the bottom four. Every ML model
+  loses ground in stress, significantly, in every setting (H3 supported everywhere).
+- **Not robust (state as P1-specific):** the hybrid's significant calm-market advantage
+  (P1 strong, P2 borderline, P3 and rolling absent). The "calm-weather model" reading holds
+  for SPY with an expanding window only.
+- **The rolling window hurts ML most** (1,000 training days, ~10 below the 1% quantile):
+  QRF/boosting fall to ranks 10–11 and the lasso control needs 5 floored forecasts. This is
+  consistent with the "few tail points" mechanism.
+- FHS-GJR's only coverage rejection is P2 at 1% (1.40% hits, p = 0.027): one rejection in
+  12 cells, about what a 5% test produces by chance, but reported.

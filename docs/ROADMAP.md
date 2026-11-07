@@ -36,7 +36,8 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 10. ✅ SHAP and permutation importance; importance stability across refits (Clarification 5).
 
 ## Week 4 — Robustness, dashboard, write-up
-11. Robustness: rolling vs expanding window, P2 and P3, α = 2.5% *(stretch: Acerbi–Szekely Z2, h = 10)*.
+11. ✅ Robustness: rolling vs expanding window, P2 and P3, α = 2.5% (Clarification 6).
+    *(Stretch, not done: Acerbi–Szekely Z2, h = 10.)*
 12. Open the 2023–2026 lockbox **once**; report it as is.
 13. Streamlit dashboard (reads saved results; no model fitting in the app).
 14. Research report (proposal format for supervisor / Mitacs) and a clean-clone reproducibility run.
