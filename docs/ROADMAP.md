@@ -47,7 +47,9 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 ## Later / partner-dependent
 - CRSP or partner P&L via the provider interface; multivariate models (DCC-GARCH, copulas);
   CAViaR; intraday realized volatility.
-- ✅ Dependency locking (`requirements-lock.txt`, 2026-11-07); GitHub Actions CI still to do.
+- ✅ Dependency locking (`requirements-lock.txt`, 2026-11-07).
+- ✅ GitHub Actions CI (`.github/workflows/tests.yml`: lint + offline tests with locked versions;
+  `make ci` runs the same locally). Committed; runs on GitHub once pushed.
 
 ## Archived (equity stock-selection plan, superseded 2026-11-06)
 Not needed for the risk study: index/ETF portfolios replace stock-level universes. Code and

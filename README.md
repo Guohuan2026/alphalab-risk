@@ -16,6 +16,12 @@ Confidence Set) with a focus on stress periods.
 - Plan: **[docs/ROADMAP.md](docs/ROADMAP.md)**
 - Results, in the order they were seen: **[docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)**
 
+### Checks
+
+```bash
+make ci               # lint + offline tests, exactly what GitHub Actions runs
+```
+
 ### Dashboard
 
 ```bash

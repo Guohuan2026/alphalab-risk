@@ -1,6 +1,6 @@
 # Shortcuts. Each target is just the command shown; run `make <target>` from the repo root
 # with the virtual environment activated.
-.PHONY: test lint format cov synthetic yahoo network dashboard
+.PHONY: test lint format cov synthetic yahoo network dashboard ci
 
 test:            ## run offline unit tests
 	python -m pytest -q
@@ -25,3 +25,6 @@ network:         ## live-data tests only
 
 dashboard:       ## open the results dashboard (needs saved results; read-only)
 	streamlit run dashboard/app.py
+
+ci:              ## what GitHub Actions runs: lint + offline tests
+	ruff check . && ruff format --check . && python -m pytest -q
