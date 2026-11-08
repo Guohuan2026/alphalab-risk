@@ -337,6 +337,29 @@ def run_stress(cfg: Config) -> dict[str, pd.DataFrame]:
     return tables
 
 
+def run_horizon(cfg: Config, h: int = 10) -> pd.DataFrame:
+    """Descriptive h-day table (√h-scaled 1-day forecasts) -> horizon{h}.csv.
+
+    Development sample only: windows must end before the lockbox start (Clarification 8).
+    """
+    from alphalab.backtest.horizon import h_day_table
+
+    if cfg.risk is None:
+        raise ValueError("config has no 'risk' section")
+    proc = _processed_dir(cfg)
+    out = _results_dir(cfg, proc)
+    path = out / "forecasts.parquet"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found; run forecast first")
+    fc = pd.read_parquet(path)
+    ret = pd.read_parquet(proc / "portfolio_daily.parquet")["ret"]
+    fcs = {name: f.drop(columns="model") for name, f in fc.groupby("model", sort=False)}
+    table = h_day_table(fcs, ret, cfg.risk.alphas, h=h, before=cfg.risk.lockbox_start)
+    table.to_csv(out / f"horizon{h}.csv", index=False)
+    log.info("wrote horizon%d.csv to %s", h, out)
+    return table
+
+
 ML_TYPES = ("qrf", "gbq", "mlvol")
 
 

@@ -552,3 +552,42 @@ cores, and across repeated fits). The test now asserts QRF is not materially wor
 the other models keep the strict assertion. LIMITATIONS #14 records that bit-identical
 reproduction holds on the original Mac setup, not across platforms.
 
+---
+
+## 2026-11-08 — Ten-day horizon, descriptive (development samples only)
+
+Specification committed first (Clarification 8, `e53085d`; the publish script gives every
+commit the generic message "chore: validated AlphaLab development update"). Forecasts:
+saved 1-day VaR/ES × √10; outcome: compounded 10-day loss; non-overlapping windows ending
+before the lockbox. Running it left all 87 existing result files byte-identical (md5); new
+file `horizon10.csv` per run. Windows: P1 and P1 rolling 653 (1997-01-14 → 2022-12-22),
+P2 414, P3 483. Two of my own test expectations were wrong before the first run (a list
+type error in a test, and a window-count bound of > 30 where ~26 is correct for the small
+synthetic run); both were fixed in the tests, not in the code.
+
+**P1 breaches (expected 6.5 / 16.3 / 32.7 at 1 / 2.5 / 5%):**
+
+| Model | 1% | 2.5% | 5% | FZ0 rank (1 / 2.5 / 5%) |
+|---|---|---|---|---|
+| FHS-GJR | 7 | 16 | 32 | 4 / 4 / 4 |
+| HAR-FHS | 8 | 15 | 29 | 2 / 1 / 1 |
+| Lasso QR | 6 | 22 | 39 | 1 / 2 / 3 |
+| GARCH-t | 9 | 19 | 40 | 3 / 3 / 2 |
+| RF-vol FHS | 7 | 19 | 35 | 6 / 6 / 5 |
+| EWMA | 11 | 18 | 32 | 9 / 7 / 6 |
+| QRF | 10 | 20 | 39 | 11 / 8 / 8 |
+| GB quantile | 19 | 30 | 49 | 10 / 11 / 9 |
+
+**Across 12 cells** (P1, P2, P3, P1 rolling × 3 levels), mean |log(breaches/expected)|:
+FHS-GJR 0.18, HAR-FHS 0.19, RF-vol FHS 0.25, HS500 0.26, HS250 0.26, QRF 0.29, EWMA 0.31,
+GJR-t 0.33, GARCH-t 0.35, lasso QR 0.38, GB quantile 0.76. FZ0 rank at 2.5%: HAR-FHS 1st on
+P1, P1 rolling and P2 (4th on P3); FHS-GJR 2nd–5th; GB quantile 8th–11th.
+
+**Reading (descriptive):** at 1%, √10 scaling understates 10-day risk: breaches exceed the
+expected count in 41 of 44 model × setting cells (median ratio 1.68), most for P2 and P3 (ratios up to 3.4, from 4–5 expected breaches). FHS-GJR
+keeps the best calibration at 10 days; the 10-day FZ0 order among the top models is
+different from the 1-day one (HAR-FHS and the lasso control ahead of FHS-GJR), but with
+414–653 windows these differences are not tested and support no conclusion. The daily
+headline (no ML model beats FHS-GJR) is not overturned: the direct-quantile ML models stay
+near the bottom.
+

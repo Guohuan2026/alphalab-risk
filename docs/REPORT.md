@@ -293,6 +293,17 @@ stress in every setting (p ≤ 0.03). **Not robust:** the hybrid's calm-period a
 significant only for P1 with an expanding window (P2 p = 0.046; P3 p = 0.68; rolling
 p = 0.31).
 
+**10-day horizon (descriptive, Clarification 8).** Each model's 1-day forecast was scaled by
+√10 (the Basel square-root-of-time rule) and compared with the compounded loss over the next
+10 sessions, in non-overlapping windows (P1: 653 windows, so 6.5 breaches expected at 1%;
+development only; no tests). On P1, scaled FHS-GJR is almost exactly on target: 7, 16 and 32
+breaches against 6.5, 16.3 and 32.7 expected. Across the 12 portfolio × α cells it has the
+breach counts closest to expected on average, followed by HAR-FHS, which has the best 10-day
+FZ0 at 2.5% in three of the four settings. At 1%, √10 scaling understates risk: breaches
+exceed the expected count in 41 of 44 model × setting cells (median 1.7×), most clearly on
+P2 and P3; gradient boosting is worst (about 3× the expected 1% breaches). The counts are too small to
+test, so this only shows that the daily ranking is not overturned at 10 days.
+
 ### 5.6 Lockbox 2023–2026: not replicated
 
 The lockbox was opened once, about 961 days per portfolio. Integrity check: re-forecasting the
@@ -448,3 +459,4 @@ shortfall (and Value-at-Risk). *Journal of Econometrics*.
 | `9925df7` | Lockbox results, as observed |
 | `69e8a1c` | Dependency lock after the clean-clone check |
 | `e81e33d` | Z2 specification (Clarification 7), before any Z2 value |
+| `e53085d` | h = 10 specification (Clarification 8), before any 10-day number (generic commit message from the publish script) |

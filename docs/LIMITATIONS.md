@@ -81,3 +81,10 @@ they can distort conclusions.
     matched to each model's median ES/VaR ratio, a zero location, and a shape that does not
     change over time; it is an approximation to simulating from each model's own predictive
     distribution, which is not stored.
+
+16. **Ten-day results are descriptive and use one scaling rule (Clarification 8).** The
+    10-day table scales 1-day forecasts by √10 rather than modelling 10-day losses directly
+    (no multi-step GARCH simulation, no ML trained on 10-day targets), so it measures
+    whether √10 scaling holds for each model, not the best achievable 10-day forecast.
+    Only 4–7 breaches are expected at 1% (414–653 non-overlapping windows), so no tests are
+    run. Development samples only.

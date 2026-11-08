@@ -38,8 +38,9 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 
 ## Week 4 — Robustness, dashboard, write-up
 11. ✅ Robustness: rolling vs expanding window, P2 and P3, α = 2.5% (Clarification 6).
-    ✅ Acerbi–Szekely Z2 (2026-11-08, Clarification 7; development only). *(Stretch, not
-    done: h = 10.)*
+    ✅ Acerbi–Szekely Z2 (2026-11-08, Clarification 7; development only). ✅ h = 10,
+    descriptive, √10-scaled 1-day forecasts (2026-11-08, Clarification 8; development only;
+    `alphalab horizon`).
 12. ✅ Lockbox opened once (2026-11-07; protocol pushed first): the development headline was
     NOT replicated in the calm 2023–26 period (docs/RESULTS_LOG.md).
 13. ✅ Streamlit dashboard (`make dashboard`; reads saved results; no model fitting in the app).

@@ -16,6 +16,7 @@ from alphalab.pipeline import (
     run_build,
     run_explain,
     run_forecast,
+    run_horizon,
     run_ingest,
     run_ingest_features,
     run_stress,
@@ -34,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
         ("forecast", "walk-forward VaR/ES forecasts for every model in the 'risk' section"),
         ("backtest", "coverage tests (Kupiec, Christoffersen, traffic light) on saved forecasts"),
         ("stress", "H3: performance by stress regime, DM/HAC tests vs the benchmark, event study"),
+        ("horizon", "descriptive 10-day table: sqrt(10)-scaled 1-day forecasts (development)"),
         (
             "explain",
             "H4: permutation importance, SHAP and the Clarification-5 criteria (ML models)",
@@ -90,6 +92,11 @@ def main(argv: list[str] | None = None) -> int:
         with pd.option_context("display.width", 120, "display.float_format", "{:.4g}".format):
             print(t["regression"].to_string(index=False))
             print(t["event_summary"].to_string(index=False))
+    elif args.command == "horizon":
+        t = run_horizon(cfg)
+        cols = ["model", "alpha", "windows", "breaches", "expected", "severity_ratio", "rank_fz0"]
+        with pd.option_context("display.width", 120, "display.float_format", "{:.4g}".format):
+            print(t[cols].to_string(index=False))
     elif args.command == "explain":
         t = run_explain(cfg)
         with pd.option_context("display.width", 140, "display.max_colwidth", 80):

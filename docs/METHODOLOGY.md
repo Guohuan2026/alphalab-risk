@@ -391,3 +391,20 @@ time-varying scale the test rejects about 5% of the time; with VaR right and ES 
 small (5,000 days) its power is about 0.83, against 1.00 for McNeil–Frey, which is sharper
 for pure ES errors. Output: `backtest_z2.csv`, with a `preregistered` flag for the models
 named in RESEARCH_DESIGN §7. Development samples only (LIMITATIONS #15).
+
+## 19. Ten-day horizon, descriptive (`backtest/horizon.py`; Clarification 8)
+
+Forecast: VaR₁₀ = √10·VaR₁ and ES₁₀ = √10·ES₁, from each model's saved 1-day forecast at
+origin t (no refitting, so no new estimation or leakage risk). Outcome (a label, evaluation
+only): L₁₀ = −(Π_{i=1..10}(1 + R_{t+i}) − 1), computed from cumulative log growth. Windows
+are non-overlapping (every 10th trading day from the first origin all models share) and
+must end before the lockbox start. Reported per model and α: windows, breaches vs T·α,
+breach ratio, realised/forecast ES on breach windows, mean FZ0 and its rank. No tests.
+
+Why √10 can fail: it is exact only for i.i.d. zero-mean returns. If today's volatility is
+high and reverts within days, √10 × today's σ overstates 10-day risk; persistent or rising
+volatility, fat tails and loss clustering make it understate. Tests show both sides: about
+the right breach count for i.i.d. normal returns, and almost no breaches when a one-day
+volatility spike is scaled by √10. They also check that the label at t uses exactly
+R_{t+1..t+10}, that windows never overlap or cross the lockbox, and that forecasts are used
+as saved. Command: `alphalab horizon --config <yaml>` → `horizon10.csv`.
