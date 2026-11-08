@@ -373,3 +373,21 @@ breaches that depend on the forecast's level. Example from the tests: breaches a
 VaR is low and 2% when it is high average 5%, show no clustering, and pass both classical
 tests, but DQ rejects them with p < 1e-6. Output: `backtest_dq.csv`. Development samples only
 (added after the lockbox was opened; RESULTS_LOG).
+
+## 18. Acerbi–Szekely Z2 ES test (`backtest/es.py: acerbi_szekely_z2`; Clarification 7)
+
+Z2 = 1 − (1/(T·α)) Σ_t L_t·1[L_t > VaR_t] / ES_t. If VaR and ES are right, E[Z2] = 0; a
+negative value means breaches are too frequent, too severe, or both. Unlike McNeil–Frey,
+which looks only at the model's own breach days, Z2 scores frequency and severity together.
+
+Its null distribution depends on the shape of the tail, and the models' full predictive
+distributions are not stored. The p-value is therefore Monte Carlo (10,000 draws) under a
+*shape-matched* Student-t: ν is chosen so that the t's ES/VaR ratio equals the median of the
+model's own ES_t/VaR_t (EWMA's normal tails give ν ≈ ∞). Only breaches matter, so a draw is
+a Binomial(T, α) number of breaches with t tail quantiles; scale cancels in L/ES.
+
+Validated in the tests: the ν inversion recovers 3, 6 and 20 exactly; under H0 with a
+time-varying scale the test rejects about 5% of the time; with VaR right and ES 20% too
+small (5,000 days) its power is about 0.83, against 1.00 for McNeil–Frey, which is sharper
+for pure ES errors. Output: `backtest_z2.csv`, with a `preregistered` flag for the models
+named in RESEARCH_DESIGN §7. Development samples only (LIMITATIONS #15).

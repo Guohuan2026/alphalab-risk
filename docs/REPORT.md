@@ -150,7 +150,9 @@ required an explicit flag.
 - **Calibration:** Kupiec (frequency), Christoffersen (independence, conditional coverage),
   Engle–Manganelli Dynamic Quantile (DQ: are breaches predictable from past breaches or from
   the VaR level itself?), Basel traffic light.
-- **ES:** McNeil–Frey exceedance-residual test (bootstrap).
+- **ES:** McNeil–Frey exceedance-residual test (bootstrap); Acerbi–Szekely Z2 (frequency and
+  severity of breaches together; Monte Carlo p-value under a shape-matched Student-t null,
+  Clarification 7; development samples only).
 - **Ranking:** mean FZ0 and tick loss; Diebold–Mariano tests with Newey–West errors; the Model
   Confidence Set (MCS, Hansen, Lunde & Nason 2011) at 90%, the headline comparison because it
   controls for comparing many models.
@@ -201,6 +203,13 @@ regressor, not from breach clustering. At 1% its breach rate is 1.50% when its V
 median and 0.76% when it is above: correct on average, but too aggressive in calm periods and
 too conservative in volatile ones. That is the mirror image of H3: calm markets are where
 FHS-GJR under-forecasts risk and where feature-based models gain.
+
+**The Acerbi–Szekely Z2 ES test** (pre-registered, implemented after the lockbox was opened,
+so development samples only) points the same way. Z2 is negative for every model on P1
+(risk understated on average). FHS-GJR is rejected in 3 of 12 cells (P1: p = 0.11, 0.037,
+0.059); HAR-FHS and the lasso control in 9; QRF in 10; every other model, including the RF
+hybrid, in all 12. McNeil–Frey, which looks only at breach days, rejects FHS-GJR and HAR-FHS
+in 2 cells each.
 
 ### 5.2 Accuracy (H2): no ML model beats FHS-GJR
 
@@ -398,6 +407,7 @@ safeguard.
 
 Barone-Adesi, G., Giannopoulos, K. & Vosper, L. (1999). VaR without correlations for
 portfolios of derivative securities. *Journal of Futures Markets*.
+Acerbi, C. & Szekely, B. (2014). Backtesting expected shortfall. *Risk*, December.
 Basel Committee on Banking Supervision. *Minimum capital requirements for market risk* (FRTB).
 Bollerslev, T. (1986). Generalized autoregressive conditional heteroskedasticity. *Journal of
 Econometrics*.
@@ -437,3 +447,4 @@ shortfall (and Value-at-Risk). *Journal of Econometrics*.
 | `dc8af86` | Lockbox protocol, pushed to GitHub before the lockbox was opened |
 | `9925df7` | Lockbox results, as observed |
 | `69e8a1c` | Dependency lock after the clean-clone check |
+| `e81e33d` | Z2 specification (Clarification 7), before any Z2 value |

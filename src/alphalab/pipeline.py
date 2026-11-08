@@ -279,7 +279,7 @@ def run_forecast(cfg: Config, include_lockbox: bool = False) -> Path:
 
 
 def run_backtest(cfg: Config, include_lockbox: bool = False) -> dict[str, pd.DataFrame]:
-    """All backtest tables -> backtest_{coverage,es,losses,dm}[_lockbox].csv.
+    """All backtest tables -> backtest_{coverage,es,losses,dm,dq,z2}[_lockbox].csv.
 
     Without the lockbox flag: the development sample. With it: ONLY the lockbox period,
     reported separately so the two are never blended.

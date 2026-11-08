@@ -283,9 +283,18 @@ with tabs[2]:
                 "Expected Shortfall (McNeil–Frey): are tail losses as large as ES predicted?"
             )
             e = es[es.alpha == alpha].sort_values("severity_ratio")
-            e = e.assign(Model=e.model.map(D.label))[
-                ["Model", "n_hits", "severity_ratio", "p_raw", "p_std"]
-            ]
+            ecols = ["Model", "n_hits", "severity_ratio", "p_raw", "p_std"]
+            z2 = D.table(run, "backtest_z2", lockbox)  # development samples only (RESULTS_LOG)
+            if z2 is not None:
+                e = e.merge(
+                    z2[z2.alpha == alpha][["model", "z2", "p_value"]].rename(
+                        columns={"p_value": "p_z2"}
+                    ),
+                    on="model",
+                    how="left",
+                )
+                ecols += ["z2", "p_z2"]
+            e = e.assign(Model=e.model.map(D.label))[ecols]
             st.dataframe(
                 e.rename(
                     columns={
@@ -293,18 +302,30 @@ with tabs[2]:
                         "severity_ratio": "Realised / forecast ES",
                         "p_raw": "p (raw)",
                         "p_std": "p (standardised)",
+                        "z2": "Z2",
+                        "p_z2": "Z2 p",
                     }
                 ).style.format(
                     {
                         "Realised / forecast ES": "{:.3f}",
                         "p (raw)": fmt_p,
                         "p (standardised)": fmt_p,
+                        "Z2": "{:.3f}",
+                        "Z2 p": fmt_p,
                     }
                 ),
                 hide_index=True,
                 width="stretch",
             )
-            st.caption("Ratio above 1 = ES understates real tail losses (the dangerous direction).")
+            st.caption(
+                "Ratio above 1 = ES understates real tail losses (the dangerous direction). "
+                "Acerbi–Szekely Z2 below 0 = breaches too frequent and/or too severe"
+                + (
+                    "."
+                    if z2 is not None
+                    else "; Z2 is development-only (added after the lockbox was opened)."
+                )
+            )
         if dm is not None:
             st.subheader("Diebold–Mariano on FZ0 (row vs column; negative = row better)")
             d = dm[dm.alpha == alpha]
@@ -591,7 +612,7 @@ with tabs[6]:
 - **Design.** 11 models (HS, EWMA, GARCH-t, GJR-t, FHS-GJR, HAR-FHS, lasso QR control, quantile forest,
   gradient boosting, RF-volatility + FHS), 1-day forecasts, walk-forward with no look-ahead, frozen at git tag
   `prereg-v1`; every later rule committed before its results (Deviations and Clarifications 1–6).
-- **Evaluation.** Kupiec / Christoffersen coverage, McNeil–Frey ES test, FZ0 joint loss, Diebold–Mariano,
+- **Evaluation.** Kupiec / Christoffersen coverage, DQ, McNeil–Frey and Acerbi–Szekely Z2 ES tests, FZ0 joint loss, Diebold–Mariano,
   Model Confidence Set, stress regimes, SHAP and permutation importance, lockbox opened once.
 - **Findings.** In development, no ML model beat FHS-GJR, and ML lost ground in crises. In the calm 2023–26 lockbox,
   feature-based models did better on average: the conclusion is regime-dependent, with FHS-GJR the robust choice.

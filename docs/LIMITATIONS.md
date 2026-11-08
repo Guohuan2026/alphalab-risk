@@ -69,3 +69,10 @@ they can distort conclusions.
     Version 1.5.0 gives materially different quantiles even with these settings pinned
     (about 20–40% at the 5% level in a test case), so QRF results reproduce only with the
     locked versions in `requirements-lock.txt`, which the setup script installs.
+
+15. **Late supplementary tests (DQ and Acerbi–Szekely Z2).** Both were pre-registered but
+    implemented after the lockbox was opened (2026-11-07 and 2026-11-08), so they are
+    reported for the development samples only. Z2's p-value assumes a Student-t tail shape
+    matched to each model's median ES/VaR ratio, a zero location, and a shape that does not
+    change over time; it is an approximation to simulating from each model's own predictive
+    distribution, which is not stored.

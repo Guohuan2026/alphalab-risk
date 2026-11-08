@@ -163,3 +163,74 @@ def test_mcneil_frey_on_simulated_truth(sim_evals, name, rejected):
     assert (res.p_std < 0.01) == rejected
     if rejected:
         assert res.severity_ratio > 1.05  # realised tail losses > 5% above forecast ES
+
+
+# ---------- Acerbi–Szekely Z2 (Clarification 7) ----------
+def test_z2_by_hand():
+    from alphalab.backtest import acerbi_szekely_z2
+
+    loss = np.array([0.01, 0.05, -0.02, 0.04, 0.0, 0.01, 0.06, -0.01, 0.0, 0.02])
+    var, es = np.full(10, 0.03), np.full(10, 0.045)
+    res = acerbi_szekely_z2(loss, var, es, 0.1, reps=500)
+    assert res.n_hits == 3
+    assert res.z2 == pytest.approx(1 - (0.05 + 0.04 + 0.06) / 0.045 / (10 * 0.1))
+    with pytest.raises(ValueError, match="VaR <= ES"):
+        acerbi_szekely_z2(loss, var, var * 0.9, 0.1)
+
+
+def test_z2_shape_matching_recovers_student_t():
+    from alphalab.backtest.es import _t_tail, shape_matched_nu
+
+    for nu in (3.0, 6.0, 20.0):
+        v, e = _t_tail(0.025, nu)
+        assert shape_matched_nu(e / v, 0.025) == pytest.approx(nu, rel=1e-4)
+    v, e = _t_tail(0.025, np.inf)
+    assert np.isinf(shape_matched_nu(e / v, 0.025))  # normal (or thinner) -> normal null
+
+
+def _t_losses(rng, n, nu, scale):
+    """Heteroskedastic Student-t losses with unit-variance shocks and their true VaR/ES."""
+    s = scale * np.sqrt((nu - 2) / nu)
+    return rng.standard_t(nu, n) * s, s
+
+
+def test_z2_size_under_null():
+    """Correct VaR and ES with time-varying scale: rejected about 5% of the time."""
+    from alphalab.backtest import acerbi_szekely_z2
+    from alphalab.backtest.es import _t_tail
+
+    rng = np.random.default_rng(11)
+    v, e = _t_tail(0.025, 5.0)
+    rej = []
+    for _ in range(400):
+        scale = np.exp(rng.normal(0, 0.4, 2000)) * 0.01
+        loss, s = _t_losses(rng, 2000, 5.0, scale)
+        res = acerbi_szekely_z2(loss, v * s, e * s, 0.025, reps=2000)
+        rej.append(res.p_value < 0.05)
+    assert 0.025 < np.mean(rej) < 0.085
+
+
+def test_z2_power_when_es_understated():
+    """VaR exactly right, ES 20% too small, 5,000 days. Measured power ~0.83 at 5% (200
+    replications, 2026-11-08; McNeil–Frey: 1.00, it is sharper for pure ES errors). The
+    bound below was set after that measurement, with margin."""
+    from alphalab.backtest import acerbi_szekely_z2
+    from alphalab.backtest.es import _t_tail
+
+    rng = np.random.default_rng(12)
+    v, e = _t_tail(0.025, 4.0)
+    rej = []
+    for _ in range(100):
+        loss, s = _t_losses(rng, 5000, 4.0, np.full(5000, 0.01))
+        res = acerbi_szekely_z2(loss, v * s, 0.8 * e * s, 0.025, reps=2000)
+        rej.append(res.p_value < 0.05)
+    assert np.mean(rej) > 0.6
+
+
+@pytest.mark.parametrize("name, rejected", [("true", False), ("gjr", False), ("ewma", True)])
+def test_z2_on_simulated_truth(sim_evals, name, rejected):
+    from alphalab.backtest import acerbi_szekely_z2
+
+    ev = sim_evals[name][0]
+    res = acerbi_szekely_z2(ev["loss_next"], ev["var_0.025"], ev["es_0.025"], 0.025)
+    assert (res.p_value < 0.01) == rejected

@@ -504,3 +504,38 @@ on average but too aggressive in calm periods and too conservative in volatile o
 passing Kupiec and Christoffersen everywhere, and the least rejected by DQ), but not perfectly
 calibrated conditional on the volatility level. Its calm-period weakness mirrors H3. This
 interpretation links two development-sample results and does not use the lockbox.
+
+---
+
+## 2026-11-08 — Acerbi–Szekely Z2 ES test (supplementary, development samples only)
+
+Specification committed first (Clarification 7, `e81e33d`). Same protocol as DQ: added after
+the lockbox was opened, so development samples only. Re-running the development backtests
+left all 32 existing tables (development and lockbox) byte-identical (md5); Z2 is a new
+table (`backtest_z2.csv`). Validation on simulated data: size ≈ 5% under H0; power ≈ 0.83
+against ES 20% too small (McNeil–Frey 1.00). The first version of the power test asserted
+rejection on one draw and failed (p = 0.09); it was restated as a replicated property after
+measuring the power. The test itself was not changed.
+
+**P1 Z2 (p-value), 1 / 2.5 / 5%:**
+
+| Model | 1% | 2.5% | 5% |
+|---|---|---|---|
+| FHS-GJR | −0.155 (0.114) | −0.146 (0.037) | −0.088 (0.059) |
+| HAR-FHS | −0.303 (0.012) | −0.215 (0.004) | −0.180 (0.001) |
+| RF-vol FHS | −0.502 (<0.001) | −0.273 (0.001) | −0.216 (<0.001) |
+| GJR-t | −0.466 (<0.001) | −0.443 (<0.001) | −0.283 (<0.001) |
+| QRF | −1.077 (<0.001) | −0.517 (<0.001) | −0.322 (<0.001) |
+| EWMA | −1.507 (<0.001) | −0.713 (<0.001) | −0.370 (<0.001) |
+| GB quantile | −2.126 (<0.001) | −1.305 (<0.001) | −0.846 (<0.001) |
+
+Every model has Z2 < 0 on P1: risk is understated on average by all of them.
+
+**Rejections at 5% (of 12 cells: P1, P2, P3, P1 rolling × 3 levels):** FHS-GJR 3 (P1 2.5%,
+P2 1% and 2.5%); HAR-FHS 9; lasso QR 9; QRF 10; every other model 12. For comparison,
+McNeil–Frey rejects FHS-GJR 2, HAR-FHS 2, GJR-t 6, GARCH-t 7, HS500 7, lasso QR 7, RF-vol
+FHS 8, GB quantile 11, EWMA, HS250 and QRF 12.
+
+**Reading:** consistent with the main results. FHS-GJR has the best ES as well as the best
+VaR calibration; the direct-quantile ML models (QRF, GB quantile) are among the worst on Z2,
+as on FZ0 in the deep tail. No headline conclusion changes.

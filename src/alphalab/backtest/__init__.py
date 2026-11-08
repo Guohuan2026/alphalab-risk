@@ -10,10 +10,12 @@ from alphalab.backtest.coverage import (
     kupiec_pof,
     traffic_light,
 )
-from alphalab.backtest.es import ESTestResult, mcneil_frey
+from alphalab.backtest.es import ESTestResult, Z2Result, acerbi_szekely_z2, mcneil_frey
 from alphalab.backtest.losses import fz0_loss, tick_loss
 
 __all__ = [
+    "acerbi_szekely_z2",
+    "Z2Result",
     "CoverageResult",
     "ESTestResult",
     "christoffersen_ind",
