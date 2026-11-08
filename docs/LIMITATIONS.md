@@ -69,6 +69,11 @@ they can distort conclusions.
     Version 1.5.0 gives materially different quantiles even with these settings pinned
     (about 20–40% at the 5% level in a test case), so QRF results reproduce only with the
     locked versions in `requirements-lock.txt`, which the setup script installs.
+    Even with locked versions, QRF output is not bit-identical across machines: a small test
+    forest gave a different FZ0 on a GitHub Linux runner than on the Mac (2026-11-08), while
+    HS on the same data matched exactly. Tree splits are sensitive to last-bit floating-point
+    differences (likely CPU-specific numerical kernels; not verified). The bit-identical
+    reproduction claim therefore holds on the original Mac setup, not across platforms.
 
 15. **Late supplementary tests (DQ and Acerbi–Szekely Z2).** Both were pre-registered but
     implemented after the lockbox was opened (2026-11-07 and 2026-11-08), so they are
