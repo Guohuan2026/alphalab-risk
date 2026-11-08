@@ -393,3 +393,19 @@ Format: date · section · change · reason · made before/after seeing affected
      folder (`run_tag`).
    - *Reading rule:* robustness results are reported next to the main ones; the headline
      conclusions stay those of P1 with the expanding window (§7, multiple testing).
+
+7. **2026-11-08 · §7 · Clarification (not a change): Acerbi–Szekely Z2 test.** Written and
+   committed before any Z2 value was computed. §7 lists Z2 but does not say how its critical
+   values are obtained, and the models' full predictive distributions are not stored.
+   - *Statistic* (loss convention, equivalent to Acerbi & Szekely's Z2 with X = −L):
+     Z2 = 1 − (1/(T·α)) Σ_t L_t·1[L_t > VaR_t] / ES_t. E[Z2] = 0 if VaR and ES are right;
+     Z2 < 0 means risk is understated. One-sided test.
+   - *Null distribution:* Monte Carlo (10,000 draws, seed 0) under a shape-matched
+     Student-t: ν is chosen so that the t's ES/VaR ratio at α equals the median of the
+     model's own ES_t/VaR_t (normal if that ratio is at or below the normal one; ν ≥ 2.05).
+     Location is taken as zero (daily mean loss ≈ 0). p = share of null draws ≤ observed Z2.
+   - *Scope:* computed for every model (the statistic needs only VaR, ES and L); the
+     pre-registered set (EWMA, GARCH family, FHS, QRF) is flagged. Development samples only,
+     for the same reason as DQ: the lockbox has already been opened.
+   - *Reading rule:* supplementary absolute ES test next to McNeil–Frey; it changes no
+     headline ranking (FZ0 remains the comparative criterion).
