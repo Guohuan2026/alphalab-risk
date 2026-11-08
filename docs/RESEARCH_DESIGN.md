@@ -409,3 +409,19 @@ Format: date · section · change · reason · made before/after seeing affected
      for the same reason as DQ: the lockbox has already been opened.
    - *Reading rule:* supplementary absolute ES test next to McNeil–Frey; it changes no
      headline ranking (FZ0 remains the comparative criterion).
+
+8. **2026-11-08 · §4 · Clarification (not a change): h = 10 days.** Written and committed
+   before any 10-day number was computed. §4 lists "h = 10 days, non-overlapping,
+   descriptive only" without saying how 10-day forecasts are made.
+   - *Forecast:* the Basel square-root-of-time rule applied to each model's existing 1-day
+     forecast made at origin t: VaR₁₀ = √10·VaR₁, ES₁₀ = √10·ES₁. No model is refitted, so
+     there is no new estimation and no new leakage risk. The question answered is whether
+     √10 scaling of each model's daily forecast holds at 10 days.
+   - *Outcome:* L₁₀ = −(Π_{i=1..10}(1 + R_{t+i}) − 1), the compounded 10-day portfolio loss.
+   - *Sampling:* non-overlapping windows: every 10th origin, starting at the first origin
+     shared by all models; only windows ending before the lockbox start (development only,
+     as the lockbox has already been opened).
+   - *Reported:* windows, breaches against the expected count T·α, realised/forecast ES on
+     breach windows, and mean FZ0, per model and α. No hypothesis tests (too few breaches:
+     about 6.5 expected at 1% on P1).
+   - *Reading rule:* descriptive robustness only; it feeds no hypothesis (H1–H4).
