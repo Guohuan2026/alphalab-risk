@@ -476,15 +476,21 @@ Format: date · section · change · reason · made before/after seeing affected
 
      | DGP | T | strict ESR | intercept ESR |
      |---|---|---|---|
-     | Student-t(5), log-normal scale | 1,000 / 2,500 / 5,000 | 22.7% / 13.7% / 9.5% | 1.7% / 2.3% / 1.5% |
-     | GJR-GARCH-t (project simulator, true forecasts) | 1,000 / 2,500 / 5,000 | 25.7% / 19.0% / 11.0% | 1.0% / 1.0% / 1.0% |
+     | Student-t(5), log-normal scale | 1,000 / 2,500 / 5,000 | 21.2% / 13.3% / 9.0% | 1.3% / 2.3% / 1.5% |
+     | GJR-GARCH-t (project simulator, true forecasts) | 1,000 / 2,500 / 5,000 | 22.0% / 17.7% / 10.5% | 0.7% / 1.0% / 0.5% |
 
-     Rates are over successful fits; unavailable fits were 0–2 per cell (at most 1 strict and
-     2 intercept, all at T ≤ 2,500). The strict test's over-size falls steadily with T, which
+     Rates are over successful fits; unavailable fits were 0–3 per cell, all at T = 1,000.
+     (Rerun with the final code, after the tie fix below; the pre-fix run differed by at
+     most 3.7 points, within Monte Carlo error.) The strict test's over-size falls steadily with T, which
      is compatible with a finite-sample distortion (it does not prove the cause).
    - *Review round 2 (2026-11-10):* inputs are normalised by sd(loss) before fitting so that
      availability and tolerances do not depend on units (slopes, Wald and t are invariant;
      intercepts are scaled back); α ∈ (0, 1) and finite one-dimensional inputs are required.
+   - *Tie fix (2026-11-10, found by CI, before the logged results):* the LP quantile fit
+     interpolates a few observations exactly; whether they counted as below q depended on
+     the last floating-point bits, which moved the Wald by up to 5% between macOS and Linux.
+     Those observations are now classified as "not below" with a tolerance of
+     1e−7·(1 + max|Y|) in normalised units (asymptotically irrelevant: k points).
      Power against ES 20% too small (T = 5,000): 100% for both in the first version; the
      final version's power is checked in the tests (ES = truth/1.5 rejected at p < 0.001).
      No reference implementation (R esreg) was available to compare against; instead a test

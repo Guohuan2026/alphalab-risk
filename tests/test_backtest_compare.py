@@ -349,9 +349,9 @@ def test_esr_input_checks_and_degenerate_samples():
 
 
 def test_esr_size_under_null():
-    """Correct VaR/ES. Measured 2026-11-10 after review round 1 (rejections at 5%, 200-300
-    reps per cell, Addition 9): strict 23-26% (T=1000), 14-19% (2500), 10-11% (5000);
-    intercept 1.0-2.3% at every T. Here 60 reps of T = 2,000, so each rate has Monte Carlo
+    """Correct VaR/ES. Measured 2026-11-10 with the final code (rejections at 5%, 200-300
+    reps per cell, Addition 9): strict 21-22% (T=1000), 13-18% (2500), 9-10.5% (5000);
+    intercept 0.5-2.3% at every T. Here 60 reps of T = 2,000, so each rate has Monte Carlo
     sd <= 0.05; bounds are about 3 sd above the measured rates at T = 2,500."""
     from alphalab.backtest import esr_backtest
     from alphalab.backtest.es import _t_tail
@@ -393,10 +393,25 @@ def test_esr_is_unit_invariant():
     for f in (1e-5, 1e-4, 1e4):
         r = esr_backtest(loss * f, v * s * f, e * s * f, 0.025)
         assert r.strict_status == "ok" and r.int_status == "ok"
-        # Not bit-identical: rescaled inputs differ in the last bits after normalisation, and
-        # the LP quantile optimum can be non-unique (a different vertex on Linux CI moved the
-        # Wald by 0.16%). Availability is exact; the statistics must agree to 1%.
-        assert r.strict_wald == pytest.approx(base.strict_wald, rel=1e-2)
-        assert r.strict_g1 == pytest.approx(base.strict_g1, rel=1e-2)
-        assert r.int_t == pytest.approx(base.int_t, rel=1e-2)
-        assert r.int_g0 == pytest.approx(base.int_g0 * f, rel=1e-2)
+        assert r.strict_wald == pytest.approx(base.strict_wald, rel=1e-6)
+        assert r.strict_g1 == pytest.approx(base.strict_g1, rel=1e-6)
+        assert r.int_t == pytest.approx(base.int_t, rel=1e-6)
+        assert r.int_g0 == pytest.approx(base.int_g0 * f, rel=1e-6)
+
+
+def test_esr_stable_under_last_bit_perturbations():
+    """Regression (CI, 2026-11-10): observations interpolated by the LP quantile fit flipped
+    between 'at' and 'below' q with the last bits, moving the Wald by up to 5% across
+    platforms. They are now classified with a tolerance (es._below)."""
+    from alphalab.backtest import esr_backtest
+    from alphalab.backtest.es import _t_tail
+
+    rng = np.random.default_rng(34)
+    v, e = _t_tail(0.025, 5.0)
+    loss, s = _t_losses(rng, 2000, 5.0, np.exp(rng.normal(0, 0.4, 2000)) * 0.01)
+    base = esr_backtest(loss, v * s, e * s, 0.025)
+    pr = np.random.default_rng(9)
+    for _ in range(12):
+        r = esr_backtest(loss * (1 + pr.normal(size=2000) * 1e-15), v * s, e * s, 0.025)
+        assert r.strict_wald == pytest.approx(base.strict_wald, rel=1e-9)
+        assert r.int_t == pytest.approx(base.int_t, rel=1e-9)

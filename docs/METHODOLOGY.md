@@ -439,6 +439,8 @@ Validated in the tests: the LP quantile regression matches the order statistic a
 weighted version matches replicated data; the intercept-only ES step equals the sample ES; a
 Nelder–Mead search cannot lower the joint FZ0 loss from our solution; with forecast ES =
 truth/1.5 the strict slope is about 1.5 and both tests reject. Simulated size at 5% with
-correct forecasts (Addition 9 has the table): strict 23–26% at T = 1,000, falling to 10–11%
-at T = 5,000; intercept 1–2.3% at every T (conservative). Output: `backtest_esr.csv`.
+correct forecasts (Addition 9 has the table): strict 21–22% at T = 1,000, falling to 9–10.5%
+at T = 5,000; intercept 0.5–2.3% at every T (conservative). Observations the LP fit
+interpolates exactly are classified as "not below q" with a small tolerance, so results do
+not depend on the last floating-point bits (they did across macOS and Linux before). Output: `backtest_esr.csv`.
 Development samples only.

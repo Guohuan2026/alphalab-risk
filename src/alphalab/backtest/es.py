@@ -270,6 +270,18 @@ def _fit_joint(
     raise ESRFitError("joint FZ0 estimation did not converge")
 
 
+def _below(y: np.ndarray, q: np.ndarray) -> np.ndarray:
+    """1[y < q] with observations ON the fitted quantile counted as not below.
+
+    An LP quantile fit interpolates a few observations (residual ~1e-15); whether they land
+    at, above or below q then depends on the last bits, which made the covariance differ
+    across platforms (2026-11-10). The tolerance is far above the LP's feasibility error
+    and far below the spacing of continuous data in normalised units.
+    """
+    tol = 1e-7 * (1.0 + float(np.max(np.abs(y))))
+    return y < q - tol
+
+
 def _hall_sheather(n: int, alpha: float) -> float:
     from scipy import stats
 
@@ -294,7 +306,7 @@ def _joint_cov(
     conditional density at q_t uses Hendricks–Koenker 'nid' difference quotients."""
     n, kq = xq.shape
     q, e = xq @ beta, xe @ gamma
-    ind = (y <= q).astype(float)
+    ind = _below(y, q).astype(float)
     s = q + (y - q) * ind / alpha
     psi = np.hstack([xq * ((ind - alpha) / (alpha * -e))[:, None], xe * ((e - s) / e**2)[:, None]])
     c = psi.T @ psi / n
@@ -357,7 +369,7 @@ def esr_backtest(loss, var, es, alpha: float, min_tail: int = 10) -> ESRResult:
         c = max(float(y.max()), 0.0)
         try:
             beta, g = _fit_joint(y - c, x, x, alpha, np.array([-c, 1.0]))
-            n_q = int(np.sum(y - c <= x @ beta))
+            n_q = int(np.sum(~_below(x @ beta, y - c)))  # at or below the fitted quantile
             if n_q < min_tail:
                 raise ESRFitError(f"only {n_q} observations at or below the fitted quantile")
             cov = _joint_cov(y - c, x, x, alpha, beta, g)
@@ -381,7 +393,7 @@ def esr_backtest(loss, var, es, alpha: float, min_tail: int = 10) -> ESRResult:
     try:
         start = float(np.min(z - cz)) - float(np.std(z)) - 1e-12
         beta, g = _fit_joint(z - cz, x, ones, alpha, np.array([start]))
-        n_tail = int(np.sum(z - cz <= x @ beta))
+        n_tail = int(np.sum(~_below(x @ beta, z - cz)))  # at or below the fitted quantile
         if n_tail < min_tail:
             raise ESRFitError(f"only {n_tail} observations at or below the fitted quantile")
         se = float(np.sqrt(_joint_cov(z - cz, x, ones, alpha, beta, g)[0, 0]))
