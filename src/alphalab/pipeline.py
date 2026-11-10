@@ -279,10 +279,11 @@ def run_forecast(cfg: Config, include_lockbox: bool = False) -> Path:
 
 
 def run_backtest(cfg: Config, include_lockbox: bool = False) -> dict[str, pd.DataFrame]:
-    """All backtest tables -> backtest_{coverage,es,losses,dm,dq,z2}[_lockbox].csv.
+    """All backtest tables -> backtest_{coverage,es,losses,dm,dq,z2,esr}[_lockbox].csv.
 
     Without the lockbox flag: the development sample. With it: ONLY the lockbox period,
-    reported separately so the two are never blended.
+    reported separately so the two are never blended, and without the development-only
+    tests (dq, z2, esr: implemented after the lockbox was opened).
     """
     proc = _processed_dir(cfg)
     out = _results_dir(cfg, proc)
@@ -298,7 +299,7 @@ def run_backtest(cfg: Config, include_lockbox: bool = False) -> dict[str, pd.Dat
         if include_lockbox:
             ev = ev[ev["target_date"] >= pd.Timestamp(cfg.risk.lockbox_start)]
         evs[name] = ev
-    tables = evaluate(evs, cfg.risk.alphas)
+    tables = evaluate(evs, cfg.risk.alphas, development=not include_lockbox)
     for key, table in tables.items():
         table.to_csv(out / f"backtest_{key}{sfx}.csv", index=False)
     log.info("wrote backtest tables to %s", out)

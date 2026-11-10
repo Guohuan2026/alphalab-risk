@@ -234,3 +234,86 @@ def test_z2_on_simulated_truth(sim_evals, name, rejected):
     ev = sim_evals[name][0]
     res = acerbi_szekely_z2(ev["loss_next"], ev["var_0.025"], ev["es_0.025"], 0.025)
     assert (res.p_value < 0.01) == rejected
+
+
+# ---------- Bayer–Dimitriadis ESR (Addition 9) ----------
+def test_quantile_regression_exact():
+    from alphalab.backtest.es import quantile_regression
+
+    rng = np.random.default_rng(31)
+    y = rng.normal(size=401)
+    b = quantile_regression(y, np.ones((401, 1)), 0.1)
+    assert b[0] == pytest.approx(np.sort(y)[40])  # 10% sample quantile (order statistic 41)
+    x = np.column_stack([np.ones(4000), rng.uniform(1, 3, 4000)])
+    yy = x[:, 1] * rng.normal(size=4000)  # true 5% quantile = -1.645 * x
+    b = quantile_regression(yy, x, 0.05)
+    assert b[0] == pytest.approx(0, abs=0.1) and b[1] == pytest.approx(-1.645, abs=0.1)
+
+
+def test_es_equation_intercept_only_is_tail_mean():
+    """With one constant regressor the FZ0 ES estimate is mean(S): the sample ES."""
+    from alphalab.backtest.es import _es_equation, quantile_regression
+
+    rng = np.random.default_rng(32)
+    y = rng.standard_t(5, 2000) - 1.0  # shifted so fitted ES < 0 without a location shift
+    x = np.ones((2000, 1))
+    q = x @ quantile_regression(y, x, 0.025)
+    g, cov = _es_equation(y, q, x, 0.025, e0=np.full(2000, -1.0))
+    s = q + (y - q) * (y <= q) / 0.025
+    assert g[0] == pytest.approx(s.mean())
+    assert cov[0, 0] == pytest.approx(s.var() / 2000)
+
+
+def test_esr_recovers_scaled_es():
+    """Forecast ES is the truth / 1.5: the strict ES slope should be about 1.5."""
+    from alphalab.backtest import esr_backtest
+    from alphalab.backtest.es import _t_tail
+
+    rng = np.random.default_rng(33)
+    v, e = _t_tail(0.025, 5.0)
+    loss, s = _t_losses(rng, 20000, 5.0, np.exp(rng.normal(0, 0.5, 20000)) * 0.01)
+    res = esr_backtest(loss, v * s, e * s / 1.5, 0.025)
+    assert res.strict_g1 == pytest.approx(1.5, abs=0.2)
+    assert res.strict_p < 1e-3 and res.int_p < 1e-3 and res.int_g0 < 0
+
+
+def test_esr_input_checks():
+    from alphalab.backtest import esr_backtest
+
+    loss = np.random.default_rng(35).normal(0, 0.01, 50)
+    with pytest.raises(ValueError, match="aligned"):
+        esr_backtest(loss, np.ones(49), np.ones(50), 0.05)
+    with pytest.raises(ValueError, match="ES > 0"):
+        esr_backtest(loss, np.ones(50), np.zeros(50), 0.05)
+    const = esr_backtest(loss, np.full(500, 0.01)[:50], np.full(50, 0.02), 0.2)
+    assert np.isnan(const.strict_p) and np.isfinite(const.int_p)  # slope not identified
+    res = esr_backtest(loss, np.full(50, 0.01), np.linspace(0.01, 0.03, 50), 0.05)
+    assert res.n_tail < 10 and np.isnan(res.strict_p) and np.isnan(res.int_p)
+
+
+def test_esr_size_under_null():
+    """Correct VaR/ES. Measured 2026-11-10 (T = 5,000, 300 reps): intercept 4.0%, strict
+    10.7% at 5% (over-sized, Addition 9). Bounds set after that measurement, with margin
+    for 100 replications of T = 3,000."""
+    from alphalab.backtest import esr_backtest
+    from alphalab.backtest.es import _t_tail
+
+    rng = np.random.default_rng(34)
+    v, e = _t_tail(0.025, 5.0)
+    rs, ri = [], []
+    for _ in range(100):
+        loss, s = _t_losses(rng, 3000, 5.0, np.exp(rng.normal(0, 0.4, 3000)) * 0.01)
+        res = esr_backtest(loss, v * s, e * s, 0.025)
+        rs.append(res.strict_p < 0.05)
+        ri.append(res.int_p < 0.05)
+    assert 0.0 < np.mean(ri) < 0.11
+    assert np.mean(rs) < 0.25  # known over-size; guards against it getting much worse
+
+
+@pytest.mark.parametrize("name, rejected", [("true", False), ("gjr", False), ("ewma", True)])
+def test_esr_on_simulated_truth(sim_evals, name, rejected):
+    from alphalab.backtest import esr_backtest
+
+    ev = sim_evals[name][0]
+    res = esr_backtest(ev["loss_next"], ev["var_0.025"], ev["es_0.025"], 0.025)
+    assert (res.int_p < 0.01) == rejected

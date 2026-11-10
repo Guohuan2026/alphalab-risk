@@ -294,6 +294,14 @@ with tabs[2]:
                     how="left",
                 )
                 ecols += ["z2", "p_z2"]
+            esr = D.table(run, "backtest_esr", lockbox)  # development samples only (Addition 9)
+            if esr is not None:
+                e = e.merge(
+                    esr[esr.alpha == alpha][["model", "strict_p", "int_p"]],
+                    on="model",
+                    how="left",
+                )
+                ecols += ["strict_p", "int_p"]
             e = e.assign(Model=e.model.map(D.label))[ecols]
             st.dataframe(
                 e.rename(
@@ -304,6 +312,8 @@ with tabs[2]:
                         "p_std": "p (standardised)",
                         "z2": "Z2",
                         "p_z2": "Z2 p",
+                        "strict_p": "ESR strict p",
+                        "int_p": "ESR intercept p",
                     }
                 ).style.format(
                     {
@@ -312,6 +322,8 @@ with tabs[2]:
                         "p (standardised)": fmt_p,
                         "Z2": "{:.3f}",
                         "Z2 p": fmt_p,
+                        "ESR strict p": fmt_p,
+                        "ESR intercept p": fmt_p,
                     }
                 ),
                 hide_index=True,

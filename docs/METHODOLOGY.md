@@ -408,3 +408,27 @@ the right breach count for i.i.d. normal returns, and almost no breaches when a 
 volatility spike is scaled by √10. They also check that the label at t uses exactly
 R_{t+1..t+10}, that windows never overlap or cross the lockbox, and that forecasts are used
 as saved. Command: `alphalab horizon --config <yaml>` → `horizon10.csv`.
+
+## 20. Bayer–Dimitriadis ESR backtest (`backtest/es.py: esr_backtest`; Addition 9)
+
+McNeil–Frey and Z2 ask whether ES is right *on average*. The expected-shortfall regression
+(ESR) backtest asks whether it is right *conditionally*: regress realised returns on the ES
+forecast in a joint quantile + ES regression, and test whether the ES equation is the identity.
+Returns convention: Y_t = −L_{t+1}, ê_t = −ES_t (forecast made at t).
+
+- *Estimation.* The quantile equation by exact linear quantile regression (LP). The ES
+  equation by the first-order condition of the FZ0 loss (G2(z) = −1/z, the esreg default):
+  iterated weighted least squares of S_t = q̂_t + (Y_t − q̂_t)·1[Y_t ≤ q̂_t]/α on the ES
+  regressors with weights 1/e_t². As in esreg, Y is shifted by max(Y, 0) during fitting so
+  every fitted e_t is negative; only the intercept moves, and it is shifted back.
+- *Strict ESR:* regressors (1, ê_t) in both equations; H0 (γ0, γ1) = (0, 1); Wald test with a
+  sandwich covariance, χ²(2).
+- *One-sided intercept ESR:* Z_t = Y_t − ê_t, ES equation on a constant; H0 γ0 = 0 against
+  γ0 < 0 (ES understated). γ̂0 = mean(S_t), se = sd(S)/√T, p = Φ(t). **This is the ESR
+  result we read.**
+
+Validated in the tests: exact quantile regression matches the order statistic; the
+intercept-only ES equation equals the sample ES; with forecast ES = truth/1.5 the strict slope
+is about 1.5. Simulation (T = 5,000, α = 2.5%, 300 replications): size 4.0% (intercept) and
+10.7% (strict, over-sized, as Bayer & Dimitriadis also find for the asymptotic version); power
+100% for both against ES 20% too small. Output: `backtest_esr.csv`. Development samples only.

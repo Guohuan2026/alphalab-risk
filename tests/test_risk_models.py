@@ -194,13 +194,16 @@ def test_forecast_and_backtest_respect_lockbox(config_yaml):
     table = tables["coverage"]
     assert len(table) == 2 * 3 and (table["last_target"] < "2021-04-01").all()
     assert "tl_green" in table.columns
-    assert set(tables) == {"coverage", "es", "losses", "dm", "dq", "z2"}
+    assert set(tables) == {"coverage", "es", "losses", "dm", "dq", "z2", "esr"}
     assert len(tables["dm"]) == 3  # one model pair x 3 alphas
     assert (out / "backtest_losses.csv").exists()
 
     run_forecast(cfg, include_lockbox=True)
-    lock = run_backtest(cfg, include_lockbox=True)["coverage"]
+    lock_tables = run_backtest(cfg, include_lockbox=True)
+    lock = lock_tables["coverage"]
     assert (lock["first_target"] >= "2021-04-01").all()
+    assert set(lock_tables) == {"coverage", "es", "losses", "dm"}  # dq/z2/esr: dev only
+    assert not (out / "backtest_esr_lockbox.csv").exists()
     assert (out / "forecast_manifest_lockbox.json").exists()
 
 

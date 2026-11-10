@@ -9,6 +9,10 @@ origins. Output tables:
 - dm       : pairwise Diebold–Mariano tests on FZ0 per α (A vs B; stat < 0 = A better)
 - dq       : Engle–Manganelli Dynamic Quantile test per model and α
 - z2       : Acerbi–Szekely Z2 ES test per model and α (Clarification 7)
+- esr      : Bayer–Dimitriadis ESR backtest per model and α (Addition 9)
+
+dq, z2 and esr are development-sample tests only (the lockbox was opened before they were
+implemented); ``development=False`` omits them.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ import pandas as pd
 
 from alphalab.backtest.compare import diebold_mariano, model_confidence_set
 from alphalab.backtest.coverage import coverage_tests, dq_test, traffic_light
-from alphalab.backtest.es import acerbi_szekely_z2, mcneil_frey
+from alphalab.backtest.es import acerbi_szekely_z2, esr_backtest, mcneil_frey
 from alphalab.backtest.losses import fz0_loss, tick_loss
 
 # Models with a full predictive distribution, for which RESEARCH_DESIGN §7 pre-registered Z2.
@@ -36,10 +40,14 @@ def align(evs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
 
 def evaluate(
-    evs: dict[str, pd.DataFrame], alphas, mcs_reps: int = 2000, seed: int = 0
+    evs: dict[str, pd.DataFrame],
+    alphas,
+    mcs_reps: int = 2000,
+    seed: int = 0,
+    development: bool = True,
 ) -> dict[str, pd.DataFrame]:
     evs = align(evs)
-    cov, es_rows, loss_rows, dm_rows, dq_rows, z2_rows = [], [], [], [], [], []
+    cov, es_rows, loss_rows, dm_rows, dq_rows, z2_rows, esr_rows = [], [], [], [], [], [], []
     for a in alphas:
         fz, tk = {}, {}
         for name, ev in evs.items():
@@ -52,7 +60,8 @@ def evaluate(
             if np.isclose(a, 0.01):
                 row |= {f"tl_{k}": v for k, v in traffic_light(hits).items()}
             cov.append(row)
-            dq_rows.append({"model": name, **dq_test(hits, var.to_numpy(), a).to_dict()})
+            if development:
+                dq_rows.append({"model": name, **dq_test(hits, var.to_numpy(), a).to_dict()})
             sigma = ev["sigma"] if ev["sigma"].notna().all() else None
             es_rows.append(
                 {"model": name, **mcneil_frey(loss, var, es, a, sigma, seed=seed).to_dict()}
@@ -64,8 +73,10 @@ def evaluate(
                     f"{es[es <= 0].index[0].date()}); FZ0 is undefined. Fix the model; "
                     "invalid forecasts are never scored silently."
                 )
-            z2 = acerbi_szekely_z2(loss, var, es, a, seed=seed).to_dict()
-            z2_rows.append({"model": name, **z2, "preregistered": name in Z2_PREREGISTERED})
+            if development:
+                z2 = acerbi_szekely_z2(loss, var, es, a, seed=seed).to_dict()
+                z2_rows.append({"model": name, **z2, "preregistered": name in Z2_PREREGISTERED})
+                esr_rows.append({"model": name, **esr_backtest(loss, var, es, a).to_dict()})
             fz[name] = fz0_loss(-loss, var, es, a)
             tk[name] = tick_loss(-loss, var, a)
         fz_df, tk_df = pd.DataFrame(fz), pd.DataFrame(tk)
@@ -95,11 +106,16 @@ def evaluate(
             )
     losses = pd.DataFrame(loss_rows)
     losses["rank_fz0"] = losses.groupby("alpha")["mean_fz0"].rank().astype(int)
-    return {
+    tables = {
         "coverage": pd.DataFrame(cov),
         "es": pd.DataFrame(es_rows),
         "losses": losses,
         "dm": pd.DataFrame(dm_rows),
-        "dq": pd.DataFrame(dq_rows),
-        "z2": pd.DataFrame(z2_rows),
     }
+    if development:
+        tables |= {
+            "dq": pd.DataFrame(dq_rows),
+            "z2": pd.DataFrame(z2_rows),
+            "esr": pd.DataFrame(esr_rows),
+        }
+    return tables

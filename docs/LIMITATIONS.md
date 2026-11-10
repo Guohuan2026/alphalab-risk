@@ -88,3 +88,11 @@ they can distort conclusions.
     whether √10 scaling holds for each model, not the best achievable 10-day forecast.
     Only 4–7 breaches are expected at 1% (414–653 non-overlapping windows), so no tests are
     run. Development samples only.
+
+17. **ESR backtest: added late, and strict ESR is over-sized (Addition 9).** The ESR test was
+    not pre-registered; it was added on 2026-11-10, after the lockbox was opened, so it is
+    exploratory and run on development samples only. Its p-values are asymptotic. In
+    simulation the strict (two-sided) version rejects a correct model about 11% of the time
+    at the 5% level, so strict-ESR p-values are shown but not read as 5% tests. The one-sided
+    intercept test has correct size (4%) and is the ESR result. A bootstrap would fix the
+    strict version but costs about two CPU-hours across all runs.

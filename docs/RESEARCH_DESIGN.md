@@ -437,7 +437,10 @@ Format: date · section · change · reason · made before/after seeing affected
      specification (esreg defaults G1 = 0, G2(z) = −1/z): the quantile equation by linear
      quantile regression (exact LP); the ES equation by its FZ0 first-order condition,
      i.e. iterated weighted least squares of S_t = q̂_t + (Y_t − q̂_t)·1[Y_t ≤ q̂_t]/α on the
-     ES regressors with weights 1/e_t² (all fitted e_t < 0 required). The quantile is a
+     ES regressors with weights 1/e_t² (all fitted e_t < 0 required; as in esreg, Y is first
+     shifted by c = max(max_t Y_t, 0) and the intercepts shifted back, so that fitted ES is
+     negative on calm days — amended 2026-11-10 after a simulation, before any real-data
+     ESR value, when a positive fitted intercept made e_t > 0). The quantile is a
      nuisance; under correct specification it does not affect the ES coefficients' asymptotic
      variance.
    - *Strict ESR (two-sided):* quantile and ES regressors (1, ê_t). H0: (γ0, γ1) = (0, 1).
@@ -455,3 +458,11 @@ Format: date · section · change · reason · made before/after seeing affected
      Bayer & Dimitriadis report that the asymptotic ESR test over-rejects in samples of a
      few hundred days at α = 2.5%; our samples are 5,000+ days, but the size is checked by
      simulation before any real result is read.
+   - *Simulation check (2026-11-10, before any real-data ESR value):* correct VaR/ES,
+     Student-t(5) with log-normal scale, T = 5,000, α = 2.5%, 300 replications: rejection at
+     5% = 10.7% for strict ESR (over-sized; 11.5% / 12.5% with / without the location shift
+     in a 200-replication diagnostic, so the shift is not the cause) and 4.0% for the
+     one-sided intercept test; power against ES 20% too small = 100% for both. *Amended
+     reading rule:* the one-sided intercept test is the ESR result; strict-ESR p-values are
+     reported but labelled over-sized (a rejection at 5% is roughly a 10% test). A bootstrap
+     (B&D's fix) was not adopted: about 2 CPU-hours for all models, levels and portfolios.
