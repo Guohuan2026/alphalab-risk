@@ -425,3 +425,33 @@ Format: date · section · change · reason · made before/after seeing affected
      breach windows, and mean FZ0, per model and α. No hypothesis tests (too few breaches:
      about 6.5 expected at 1% on P1).
    - *Reading rule:* descriptive robustness only; it feeds no hypothesis (H1–H4).
+
+9. **2026-11-10 · §7 · Addition (not pre-registered): Bayer–Dimitriadis ESR backtest.**
+   Written and committed before any ESR value was computed on real or simulated data. §7
+   has no conditional ES test: McNeil–Frey and Z2 check ES on average, not whether ES errors
+   are predictable from the forecast itself. The ESR test (Bayer & Dimitriadis 2020, *J.
+   Financial Econometrics* 20(3)) fills that gap. Because it is added after `prereg-v1` and
+   after the lockbox was opened, it is exploratory and changes nothing that was pre-registered.
+   - *Convention:* returns Y_t = −L_{t+1}, ES forecast in return units ê_t = −ES_t (made at
+     origin t). Joint (quantile, ES) regression at level α, estimated with the FZ0
+     specification (esreg defaults G1 = 0, G2(z) = −1/z): the quantile equation by linear
+     quantile regression (exact LP); the ES equation by its FZ0 first-order condition,
+     i.e. iterated weighted least squares of S_t = q̂_t + (Y_t − q̂_t)·1[Y_t ≤ q̂_t]/α on the
+     ES regressors with weights 1/e_t² (all fitted e_t < 0 required). The quantile is a
+     nuisance; under correct specification it does not affect the ES coefficients' asymptotic
+     variance.
+   - *Strict ESR (two-sided):* quantile and ES regressors (1, ê_t). H0: (γ0, γ1) = (0, 1).
+     Wald statistic with a misspecification-robust sandwich covariance
+     Λ⁻¹CΛ⁻¹/T, Λ = mean(X Xᵀ/e²), C = mean(X Xᵀ (e − S)²/e⁴); χ²(2) p-value.
+   - *One-sided intercept ESR:* Z_t = Y_t − ê_t; quantile regressors (1, ê_t), ES regressor 1.
+     H0: γ0 = 0 against H1: γ0 < 0 (realised tail worse than forecast ES = ES understated).
+     γ̂0 = mean(S_t); t = γ̂0/se with the same sandwich (here sd(S)/√T); p = Φ(t).
+   - *Inference:* asymptotic only (no bootstrap). Fewer than 10 observations at or below
+     the fitted quantile → NaN, as McNeil–Frey does with too few hits.
+   - *Scope:* every model, α ∈ the configured levels, development samples only (as DQ and Z2;
+     the lockbox has been opened). Not run on lockbox tables.
+   - *Reading rule:* supplementary absolute ES test next to McNeil–Frey and Z2. It feeds no
+     hypothesis (H1–H4) and changes no headline ranking (FZ0 + MCS remain the criteria).
+     Bayer & Dimitriadis report that the asymptotic ESR test over-rejects in samples of a
+     few hundred days at α = 2.5%; our samples are 5,000+ days, but the size is checked by
+     simulation before any real result is read.
