@@ -427,42 +427,60 @@ Format: date · section · change · reason · made before/after seeing affected
    - *Reading rule:* descriptive robustness only; it feeds no hypothesis (H1–H4).
 
 9. **2026-11-10 · §7 · Addition (not pre-registered): Bayer–Dimitriadis ESR backtest.**
-   Written and committed before any ESR value was computed on real or simulated data. §7
-   has no conditional ES test: McNeil–Frey and Z2 check ES on average, not whether ES errors
-   are predictable from the forecast itself. The ESR test (Bayer & Dimitriadis 2020, *J.
-   Financial Econometrics* 20(3)) fills that gap. Because it is added after `prereg-v1` and
-   after the lockbox was opened, it is exploratory and changes nothing that was pre-registered.
+   Written and committed before any ESR value was computed on real or simulated data
+   (commit `2a8ed66`); amended twice the same day, both times before any real-data ESR value
+   (see the end of this entry). §7 has no conditional ES test: McNeil–Frey and Z2 check ES on
+   average, not whether ES errors are predictable from the forecast itself. The ESR test
+   (Bayer & Dimitriadis 2020, *J. Financial Econometrics* 20(3)) fills that gap. Because it is
+   added after `prereg-v1` and after the lockbox was opened, it is exploratory and changes
+   nothing that was pre-registered.
    - *Convention:* returns Y_t = −L_{t+1}, ES forecast in return units ê_t = −ES_t (made at
-     origin t). Joint (quantile, ES) regression at level α, estimated with the FZ0
-     specification (esreg defaults G1 = 0, G2(z) = −1/z): the quantile equation by linear
-     quantile regression (exact LP); the ES equation by its FZ0 first-order condition,
-     i.e. iterated weighted least squares of S_t = q̂_t + (Y_t − q̂_t)·1[Y_t ≤ q̂_t]/α on the
-     ES regressors with weights 1/e_t² (all fitted e_t < 0 required; as in esreg, Y is first
-     shifted by c = max(max_t Y_t, 0) and the intercepts shifted back, so that fitted ES is
-     negative on calm days — amended 2026-11-10 after a simulation, before any real-data
-     ESR value, when a positive fitted intercept made e_t > 0). The quantile is a
-     nuisance; under correct specification it does not affect the ES coefficients' asymptotic
-     variance.
-   - *Strict ESR (two-sided):* quantile and ES regressors (1, ê_t). H0: (γ0, γ1) = (0, 1).
-     Wald statistic with a misspecification-robust sandwich covariance
-     Λ⁻¹CΛ⁻¹/T, Λ = mean(X Xᵀ/e²), C = mean(X Xᵀ (e − S)²/e⁴); χ²(2) p-value.
+     origin t).
+   - *Estimator:* the joint (quantile, ES) M-estimator minimising mean FZ0 loss (esreg
+     defaults G1 = 0, G2(z) = −1/z), by block coordinate descent: weighted linear quantile
+     regression with weights 1/(−e_t) given e (exact LP), then the ES coefficients given q
+     (iterated weighted least squares on S_t = q_t + (Y_t − q_t)·1[Y_t ≤ q_t]/α, weights
+     1/e_t², with step halving that keeps all e_t < 0 and never raises the loss), until the
+     joint loss stops falling. As in esreg, Y is shifted by c = max(max_t Y_t, 0) while
+     fitting and the intercepts are shifted back.
+   - *Covariance:* the full misspecification-robust sandwich Λ⁻¹CΛ⁻ᵀ/T for (β, γ)
+     (Dimitriadis & Bayer 2019; esreg `vcovA` with misspecification terms), including the
+     cross blocks with (1[Y ≤ q] − α) and the (e − S)/e³ term in the ES block; the conditional
+     density at q_t by Hendricks–Koenker difference quotients with the Hall–Sheather
+     bandwidth. The ES block is used.
+   - *Strict ESR (two-sided):* quantile and ES regressors (1, ê_t). H0: (γ0, γ1) = (0, 1);
+     Wald statistic, χ²(2) p-value.
    - *One-sided intercept ESR:* Z_t = Y_t − ê_t; quantile regressors (1, ê_t), ES regressor 1.
-     H0: γ0 = 0 against H1: γ0 < 0 (realised tail worse than forecast ES = ES understated).
-     γ̂0 = mean(S_t); t = γ̂0/se with the same sandwich (here sd(S)/√T); p = Φ(t).
-   - *Inference:* asymptotic only (no bootstrap). Fewer than 10 observations at or below
-     the fitted quantile → NaN, as McNeil–Frey does with too few hits.
+     H0: γ0 = 0 against H1: γ0 < 0 (realised tail worse than forecast ES = ES understated);
+     t = γ̂0/se, p = Φ(t).
+   - *Unavailable results:* fewer than 10 observations at or below the fitted quantile, a
+     (nearly) constant ES forecast (strict only: slope not identified), a failed fit or an
+     ill-conditioned sandwich → NaN with the reason in `strict_status` / `int_status`; the
+     other test is still computed. Never a pseudo-inverse.
    - *Scope:* every model, α ∈ the configured levels, development samples only (as DQ and Z2;
      the lockbox has been opened). Not run on lockbox tables.
    - *Reading rule:* supplementary absolute ES test next to McNeil–Frey and Z2. It feeds no
-     hypothesis (H1–H4) and changes no headline ranking (FZ0 + MCS remain the criteria).
-     Bayer & Dimitriadis report that the asymptotic ESR test over-rejects in samples of a
-     few hundred days at α = 2.5%; our samples are 5,000+ days, but the size is checked by
-     simulation before any real result is read.
-   - *Simulation check (2026-11-10, before any real-data ESR value):* correct VaR/ES,
-     Student-t(5) with log-normal scale, T = 5,000, α = 2.5%, 300 replications: rejection at
-     5% = 10.7% for strict ESR (over-sized; 11.5% / 12.5% with / without the location shift
-     in a 200-replication diagnostic, so the shift is not the cause) and 4.0% for the
-     one-sided intercept test; power against ES 20% too small = 100% for both. *Amended
-     reading rule:* the one-sided intercept test is the ESR result; strict-ESR p-values are
-     reported but labelled over-sized (a rejection at 5% is roughly a 10% test). A bootstrap
-     (B&D's fix) was not adopted: about 2 CPU-hours for all models, levels and portfolios.
+     hypothesis (H1–H4) and changes no headline ranking (FZ0 + MCS remain the criteria). The
+     one-sided intercept test is the ESR result; it is conservative in our simulations, so a
+     non-rejection is weak evidence. Strict-ESR p-values are shown but labelled over-sized and
+     are not read as 5% tests.
+   - *Amendment 1 (after the first simulation):* the location shift was added when a
+     positive fitted intercept made some fitted e_t > 0.
+   - *Amendment 2 (after code review round 1, 2026-11-10):* the first version fitted the
+     quantile unweighted and once (a two-step estimator, not the joint FZ0 one) and used
+     only the correctly-specified ES block of the covariance; replaced by the estimator and
+     sandwich above. Its simulated size (strict 10.7%, intercept 4.0% at T = 5,000) is
+     superseded.
+   - *Simulation check of the final version (before any real-data value):* correct VaR/ES,
+     rejection rate at 5% (200–300 replications per cell, Monte Carlo sd ≤ 0.025):
+
+     | DGP | T | strict ESR | intercept ESR |
+     |---|---|---|---|
+     | Student-t(5), log-normal scale | 1,000 / 2,500 / 5,000 | 22.7% / 13.7% / 9.5% | 1.7% / 2.3% / 1.5% |
+     | GJR-GARCH-t (project simulator, true forecasts) | 1,000 / 2,500 / 5,000 | 25.7% / 19.0% / 11.0% | 1.0% / 1.0% / 1.0% |
+
+     The strict test's over-size falls steadily with T, as a finite-sample effect would.
+     Power against ES 20% too small (T = 5,000): 100% for both in the first version; the
+     final version's power is checked in the tests (ES = truth/1.5 rejected at p < 0.001).
+     No reference implementation (R esreg) was available to compare against; instead a test
+     checks that a local optimiser cannot lower the joint FZ0 loss from our solution.

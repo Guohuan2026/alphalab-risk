@@ -250,18 +250,58 @@ def test_quantile_regression_exact():
     assert b[0] == pytest.approx(0, abs=0.1) and b[1] == pytest.approx(-1.645, abs=0.1)
 
 
-def test_es_equation_intercept_only_is_tail_mean():
-    """With one constant regressor the FZ0 ES estimate is mean(S): the sample ES."""
-    from alphalab.backtest.es import _es_equation, quantile_regression
+def test_weighted_quantile_regression_equals_replication():
+    """Integer weights = repeating observations."""
+    from alphalab.backtest.es import quantile_regression
+
+    rng = np.random.default_rng(36)
+    x = np.column_stack([np.ones(300), rng.uniform(1, 2, 300)])
+    y = x[:, 1] * rng.normal(size=300)
+    w = rng.integers(1, 4, 300)
+    b_w = quantile_regression(y, x, 0.1, weights=w)
+    b_r = quantile_regression(np.repeat(y, w), np.repeat(x, w, axis=0), 0.1)
+
+    def obj(b):  # LP optima can be non-unique, so compare the weighted objective
+        r = y - x @ b
+        return np.sum(w * r * (0.1 - (r < 0)))
+
+    assert obj(b_w) == pytest.approx(obj(b_r), rel=1e-9)
+
+
+def test_es_step_intercept_only_is_tail_mean():
+    """With one constant ES regressor the FZ0 ES estimate is mean(S): the sample ES."""
+    from alphalab.backtest.es import _es_step, quantile_regression
 
     rng = np.random.default_rng(32)
-    y = rng.standard_t(5, 2000) - 1.0  # shifted so fitted ES < 0 without a location shift
+    y = rng.standard_t(5, 2000) - 1.0
     x = np.ones((2000, 1))
     q = x @ quantile_regression(y, x, 0.025)
-    g, cov = _es_equation(y, q, x, 0.025, e0=np.full(2000, -1.0))
+    g = _es_step(y, q, x, 0.025, np.array([-1.0]))
     s = q + (y - q) * (y <= q) / 0.025
-    assert g[0] == pytest.approx(s.mean())
-    assert cov[0, 0] == pytest.approx(s.var() / 2000)
+    assert g[0] == pytest.approx(s.mean(), rel=1e-9)
+
+
+def test_esr_is_the_joint_fz0_optimum():
+    """Code review round 1 case: no local optimiser can lower the joint FZ0 loss further."""
+    from scipy.optimize import minimize
+
+    from alphalab.backtest.es import _fit_joint, _fz0
+
+    rng = np.random.default_rng(0)
+    n = 1000
+    sc = np.exp(rng.normal(0, 0.8, n)) * 0.01
+    y = -rng.standard_t(5, n) * sc
+    x = np.column_stack([np.ones(n), -3.52 * sc])
+    c = max(y.max(), 0.0)
+    beta, gamma = _fit_joint(y - c, x, x, 0.025, np.array([-c, 1.0]))
+
+    def f(th):
+        e = x @ th[2:]
+        return _fz0(y - c, x @ th[:2], e, 0.025) if np.all(e < 0) else np.inf
+
+    th = np.r_[beta, gamma]
+    nm = minimize(f, th, method="Nelder-Mead", options={"xatol": 1e-12, "fatol": 1e-15})
+    assert f(th) <= nm.fun + 1e-12
 
 
 def test_esr_recovers_scaled_es():
@@ -277,37 +317,48 @@ def test_esr_recovers_scaled_es():
     assert res.strict_p < 1e-3 and res.int_p < 1e-3 and res.int_g0 < 0
 
 
-def test_esr_input_checks():
+def test_esr_input_checks_and_degenerate_samples():
     from alphalab.backtest import esr_backtest
 
-    loss = np.random.default_rng(35).normal(0, 0.01, 50)
+    rng = np.random.default_rng(35)
+    loss = rng.normal(0, 0.01, 50)
     with pytest.raises(ValueError, match="aligned"):
         esr_backtest(loss, np.ones(49), np.ones(50), 0.05)
     with pytest.raises(ValueError, match="ES > 0"):
         esr_backtest(loss, np.ones(50), np.zeros(50), 0.05)
-    const = esr_backtest(loss, np.full(500, 0.01)[:50], np.full(50, 0.02), 0.2)
-    assert np.isnan(const.strict_p) and np.isfinite(const.int_p)  # slope not identified
-    res = esr_backtest(loss, np.full(50, 0.01), np.linspace(0.01, 0.03, 50), 0.05)
-    assert res.n_tail < 10 and np.isnan(res.strict_p) and np.isnan(res.int_p)
+    few = esr_backtest(loss, np.full(50, 0.01), np.linspace(0.01, 0.03, 50), 0.05)
+    assert few.n_tail < 10 and np.isnan(few.strict_p) and np.isnan(few.int_p)
+    assert few.strict_status != "ok" and few.int_status != "ok"
+    # Review round 1: a (nearly) constant forecast must not abort; the intercept test runs.
+    n = 1000
+    loss = np.random.default_rng(1).normal(0, 0.01, n)
+    for es in (np.full(n, 0.02), 0.02 + np.linspace(0, 1e-12, n)):
+        res = esr_backtest(loss, 0.8 * es, es, 0.025)
+        assert "not identified" in res.strict_status and np.isnan(res.strict_p)
+        assert res.int_status == "ok" and np.isfinite(res.int_p)
+    # All-zero losses: nothing estimable, but no exception either.
+    res = esr_backtest(np.zeros(n), np.full(n, 0.01), np.linspace(0.01, 0.03, n), 0.025)
+    assert np.isnan(res.strict_p) and np.isnan(res.int_p)
 
 
 def test_esr_size_under_null():
-    """Correct VaR/ES. Measured 2026-11-10 (T = 5,000, 300 reps): intercept 4.0%, strict
-    10.7% at 5% (over-sized, Addition 9). Bounds set after that measurement, with margin
-    for 100 replications of T = 3,000."""
+    """Correct VaR/ES. Measured 2026-11-10 after review round 1 (rejections at 5%, 200-300
+    reps per cell, Addition 9): strict 23-26% (T=1000), 14-19% (2500), 10-11% (5000);
+    intercept 1.0-2.3% at every T. Here 60 reps of T = 2,000, so each rate has Monte Carlo
+    sd <= 0.05; bounds are about 3 sd above the measured rates at T = 2,500."""
     from alphalab.backtest import esr_backtest
     from alphalab.backtest.es import _t_tail
 
     rng = np.random.default_rng(34)
     v, e = _t_tail(0.025, 5.0)
     rs, ri = [], []
-    for _ in range(100):
-        loss, s = _t_losses(rng, 3000, 5.0, np.exp(rng.normal(0, 0.4, 3000)) * 0.01)
+    for _ in range(60):
+        loss, s = _t_losses(rng, 2000, 5.0, np.exp(rng.normal(0, 0.4, 2000)) * 0.01)
         res = esr_backtest(loss, v * s, e * s, 0.025)
         rs.append(res.strict_p < 0.05)
         ri.append(res.int_p < 0.05)
-    assert 0.0 < np.mean(ri) < 0.11
-    assert np.mean(rs) < 0.25  # known over-size; guards against it getting much worse
+    assert np.mean(ri) <= 0.10  # conservative in finite samples
+    assert np.mean(rs) <= 0.32  # known over-size; guards against it getting worse
 
 
 @pytest.mark.parametrize("name, rejected", [("true", False), ("gjr", False), ("ewma", True)])

@@ -416,19 +416,27 @@ McNeil–Frey and Z2 ask whether ES is right *on average*. The expected-shortfal
 forecast in a joint quantile + ES regression, and test whether the ES equation is the identity.
 Returns convention: Y_t = −L_{t+1}, ê_t = −ES_t (forecast made at t).
 
-- *Estimation.* The quantile equation by exact linear quantile regression (LP). The ES
-  equation by the first-order condition of the FZ0 loss (G2(z) = −1/z, the esreg default):
-  iterated weighted least squares of S_t = q̂_t + (Y_t − q̂_t)·1[Y_t ≤ q̂_t]/α on the ES
-  regressors with weights 1/e_t². As in esreg, Y is shifted by max(Y, 0) during fitting so
-  every fitted e_t is negative; only the intercept moves, and it is shifted back.
-- *Strict ESR:* regressors (1, ê_t) in both equations; H0 (γ0, γ1) = (0, 1); Wald test with a
-  sandwich covariance, χ²(2).
-- *One-sided intercept ESR:* Z_t = Y_t − ê_t, ES equation on a constant; H0 γ0 = 0 against
-  γ0 < 0 (ES understated). γ̂0 = mean(S_t), se = sd(S)/√T, p = Φ(t). **This is the ESR
-  result we read.**
+- *Estimation.* The joint M-estimator that minimises mean FZ0 loss (G1 = 0, G2(z) = −1/z,
+  the esreg default). Given e, the quantile part is a pinball loss weighted by 1/(−e_t),
+  solved exactly as a linear programme; given q, the ES part has the first-order condition
+  Σ X(e − S)/e² = 0 with S_t = q_t + (Y_t − q_t)·1[Y_t ≤ q_t]/α, solved by iterated weighted
+  least squares with step halving (all e_t < 0, loss never rises). The two blocks alternate
+  until the joint loss stops falling. As in esreg, Y is shifted by max(Y, 0) while fitting.
+- *Covariance.* Full misspecification-robust sandwich for (β, γ): the bread includes the
+  quantile block (conditional density by Hendricks–Koenker difference quotients), the cross
+  blocks in (1[Y ≤ q] − α), and the ES block 1/e² − 2(e − S)/e³; the meat is the outer
+  product of the stacked scores. The ES block is used.
+- *Strict ESR:* regressors (1, ê_t) in both equations; H0 (γ0, γ1) = (0, 1); Wald test, χ²(2).
+- *One-sided intercept ESR:* Z_t = Y_t − ê_t, quantile on (1, ê_t), ES on a constant; H0
+  γ0 = 0 against γ0 < 0 (ES understated); p = Φ(γ̂0/se). **This is the ESR result we read.**
+- *Unavailable results* (too few tail observations, constant forecast, failed fit,
+  ill-conditioned sandwich) are NaN with a reason in `strict_status` / `int_status`; the
+  other test still runs.
 
-Validated in the tests: exact quantile regression matches the order statistic; the
-intercept-only ES equation equals the sample ES; with forecast ES = truth/1.5 the strict slope
-is about 1.5. Simulation (T = 5,000, α = 2.5%, 300 replications): size 4.0% (intercept) and
-10.7% (strict, over-sized, as Bayer & Dimitriadis also find for the asymptotic version); power
-100% for both against ES 20% too small. Output: `backtest_esr.csv`. Development samples only.
+Validated in the tests: the LP quantile regression matches the order statistic and the
+weighted version matches replicated data; the intercept-only ES step equals the sample ES; a
+Nelder–Mead search cannot lower the joint FZ0 loss from our solution; with forecast ES =
+truth/1.5 the strict slope is about 1.5 and both tests reject. Simulated size at 5% with
+correct forecasts (Addition 9 has the table): strict 23–26% at T = 1,000, falling to 10–11%
+at T = 5,000; intercept 1–2.3% at every T (conservative). Output: `backtest_esr.csv`.
+Development samples only.

@@ -11,6 +11,7 @@ from alphalab.backtest.coverage import (
     traffic_light,
 )
 from alphalab.backtest.es import (
+    ESRFitError,
     ESRResult,
     ESTestResult,
     Z2Result,
@@ -25,6 +26,7 @@ __all__ = [
     "Z2Result",
     "CoverageResult",
     "ESTestResult",
+    "ESRFitError",
     "ESRResult",
     "esr_backtest",
     "christoffersen_ind",

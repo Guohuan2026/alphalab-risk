@@ -312,7 +312,7 @@ with tabs[2]:
                         "p_std": "p (standardised)",
                         "z2": "Z2",
                         "p_z2": "Z2 p",
-                        "strict_p": "ESR strict p",
+                        "strict_p": "ESR strict p (over-sized)",
                         "int_p": "ESR intercept p",
                     }
                 ).style.format(
@@ -322,7 +322,7 @@ with tabs[2]:
                         "p (standardised)": fmt_p,
                         "Z2": "{:.3f}",
                         "Z2 p": fmt_p,
-                        "ESR strict p": fmt_p,
+                        "ESR strict p (over-sized)": fmt_p,
                         "ESR intercept p": fmt_p,
                     }
                 ),
@@ -338,6 +338,13 @@ with tabs[2]:
                     else "; Z2 is development-only (added after the lockbox was opened)."
                 )
             )
+            if esr is not None:
+                st.caption(
+                    "ESR (exploratory, development only): intercept p < 0.05 = ES understated "
+                    "after conditioning on the forecast. Strict-ESR p-values are asymptotic and "
+                    "over-reject a correct model in simulation; do not read them as 5% tests "
+                    "(LIMITATIONS #17)."
+                )
         if dm is not None:
             st.subheader("Diebold–Mariano on FZ0 (row vs column; negative = row better)")
             d = dm[dm.alpha == alpha]
