@@ -299,7 +299,7 @@ def _joint_cov(
     psi = np.hstack([xq * ((ind - alpha) / (alpha * -e))[:, None], xe * ((e - s) / e**2)[:, None]])
     c = psi.T @ psi / n
     h = _hall_sheather(n, alpha)
-    lo, hi = max(alpha - h, 1e-4), min(alpha + h, 0.5)
+    lo, hi = max(alpha - h, alpha / 2), min(alpha + h, (1 + alpha) / 2)  # ordered, in (0, 1)
     dq = xq @ (quantile_regression(y, xq, hi) - quantile_regression(y, xq, lo))
     f = np.where(dq > 0, (hi - lo) / np.where(dq > 0, dq, 1.0), 0.0)
     l11 = (xq * (f / (alpha * -e))[:, None]).T @ xq / n
@@ -317,23 +317,32 @@ def esr_backtest(loss, var, es, alpha: float, min_tail: int = 10) -> ESRResult:
     """Strict and one-sided intercept ESR tests (Bayer & Dimitriadis 2020), asymptotic p-values.
 
     loss = realised L_{t+1}; var, es = forecasts made at t (positive = loss). ``var`` is only
-    validated: the ESR regressions use the ES forecast alone, as in the paper. A test that
-    cannot be computed on the sample returns NaN with the reason in its ``*_status`` field;
-    the other test is still computed.
+    checked (finite, aligned): the ESR regressions use the ES forecast alone, as in the
+    paper. A test that cannot be computed on the sample returns NaN with the reason in its
+    ``*_status`` field; the other test is still computed. Inputs are normalised by sd(loss)
+    internally, so results do not depend on units.
     """
     from scipy import stats
 
+    if not (np.isfinite(alpha) and 0 < alpha < 1):
+        raise ValueError("alpha must be in (0, 1)")
     loss = np.asarray(loss, dtype=float)
     var = np.asarray(var, dtype=float)
     es = np.asarray(es, dtype=float)
+    if loss.ndim != 1 or var.ndim != 1 or es.ndim != 1:
+        raise ValueError("loss, var and es must be one-dimensional")
     if not (len(loss) == len(var) == len(es)) or len(loss) == 0:
         raise ValueError("loss, var and es must be aligned and non-empty")
-    if not (np.all(np.isfinite(loss)) and np.all(np.isfinite(es))):
-        raise ValueError("loss and es must be finite")
+    if not (np.all(np.isfinite(loss)) and np.all(np.isfinite(var)) and np.all(np.isfinite(es))):
+        raise ValueError("loss, var and es must be finite")
     if np.any(es <= 0):
         raise ValueError("need ES > 0 (loss units)")
     n = len(loss)
-    y, ehat = -loss, -es
+    # Work in normalised units (divide by ``unit``) so tolerances and the conditioning check do not
+    # depend on whether returns are in decimals, percent or basis points. Slopes, Wald and t
+    # statistics are invariant; intercepts are multiplied back by ``unit``.
+    unit = float(np.std(loss)) or float(np.mean(es))
+    y, ehat = -loss / unit, -es / unit
     # The slope is identified only if the forecast varies (relative to its own size).
     identified = np.std(ehat) > 1e-8 * np.mean(np.abs(ehat))
     x = np.column_stack([np.ones(n), ehat]) if identified else np.ones((n, 1))
@@ -348,15 +357,15 @@ def esr_backtest(loss, var, es, alpha: float, min_tail: int = 10) -> ESRResult:
         c = max(float(y.max()), 0.0)
         try:
             beta, g = _fit_joint(y - c, x, x, alpha, np.array([-c, 1.0]))
-            k = int(np.sum(y - c <= x @ beta))
-            if k < min_tail:
-                raise ESRFitError(f"only {k} observations at or below the fitted quantile")
+            n_q = int(np.sum(y - c <= x @ beta))
+            if n_q < min_tail:
+                raise ESRFitError(f"only {n_q} observations at or below the fitted quantile")
             cov = _joint_cov(y - c, x, x, alpha, beta, g)
             d = g + np.array([c, 0.0]) - np.array([0.0, 1.0])
             wald = float(d @ np.linalg.solve(cov, d))
             if not np.isfinite(wald) or wald < 0:
                 raise ESRFitError("covariance is not positive definite")
-            sg0, sg1 = float(g[0] + c), float(g[1])
+            sg0, sg1 = float((g[0] + c) * unit), float(g[1])
             p_strict, s_status = float(stats.chi2.sf(wald, 2)), "ok"
         except (ESRFitError, np.linalg.LinAlgError) as err:
             sg0 = sg1 = wald = np.nan
@@ -378,8 +387,8 @@ def esr_backtest(loss, var, es, alpha: float, min_tail: int = 10) -> ESRResult:
         se = float(np.sqrt(_joint_cov(z - cz, x, ones, alpha, beta, g)[0, 0]))
         if not (np.isfinite(se) and se > 0):
             raise ESRFitError("zero or undefined standard error")
-        g0 = float(g[0] + cz)
-        t = g0 / se
+        t = float(g[0] + cz) / se
+        g0 = float(g[0] + cz) * unit
         p_int, i_status = float(stats.norm.cdf(t)), "ok"
     except (ESRFitError, np.linalg.LinAlgError) as err:
         g0 = t = p_int = np.nan

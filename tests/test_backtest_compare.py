@@ -326,6 +326,13 @@ def test_esr_input_checks_and_degenerate_samples():
         esr_backtest(loss, np.ones(49), np.ones(50), 0.05)
     with pytest.raises(ValueError, match="ES > 0"):
         esr_backtest(loss, np.ones(50), np.zeros(50), 0.05)
+    for bad in (0.0, 1.0, np.nan):
+        with pytest.raises(ValueError, match="alpha"):
+            esr_backtest(loss, np.ones(50), np.ones(50), bad)
+    with pytest.raises(ValueError, match="finite"):
+        esr_backtest(loss, np.full(50, np.nan), np.ones(50), 0.05)
+    with pytest.raises(ValueError, match="one-dimensional"):
+        esr_backtest(loss[:, None], np.ones((50, 1)), np.ones((50, 1)), 0.05)
     few = esr_backtest(loss, np.full(50, 0.01), np.linspace(0.01, 0.03, 50), 0.05)
     assert few.n_tail < 10 and np.isnan(few.strict_p) and np.isnan(few.int_p)
     assert few.strict_status != "ok" and few.int_status != "ok"
@@ -355,6 +362,7 @@ def test_esr_size_under_null():
     for _ in range(60):
         loss, s = _t_losses(rng, 2000, 5.0, np.exp(rng.normal(0, 0.4, 2000)) * 0.01)
         res = esr_backtest(loss, v * s, e * s, 0.025)
+        assert res.strict_status == "ok" and res.int_status == "ok"  # NaN must not pass
         rs.append(res.strict_p < 0.05)
         ri.append(res.int_p < 0.05)
     assert np.mean(ri) <= 0.10  # conservative in finite samples
@@ -367,4 +375,25 @@ def test_esr_on_simulated_truth(sim_evals, name, rejected):
 
     ev = sim_evals[name][0]
     res = esr_backtest(ev["loss_next"], ev["var_0.025"], ev["es_0.025"], 0.025)
+    assert res.int_status == "ok" and np.isfinite(res.int_p)
     assert (res.int_p < 0.01) == rejected
+
+
+def test_esr_is_unit_invariant():
+    """Review round 2: rescaling losses and forecasts (decimals vs bp) must not change
+    availability or test statistics; intercepts scale with the units."""
+    from alphalab.backtest import esr_backtest
+    from alphalab.backtest.es import _t_tail
+
+    rng = np.random.default_rng(34)
+    v, e = _t_tail(0.025, 5.0)
+    loss, s = _t_losses(rng, 2000, 5.0, np.exp(rng.normal(0, 0.4, 2000)) * 0.01)
+    base = esr_backtest(loss, v * s, e * s, 0.025)
+    assert base.strict_status == "ok" and base.int_status == "ok"
+    for f in (1e-5, 1e-4, 1e4):
+        r = esr_backtest(loss * f, v * s * f, e * s * f, 0.025)
+        assert r.strict_status == "ok" and r.int_status == "ok"
+        assert r.strict_wald == pytest.approx(base.strict_wald, rel=1e-6)
+        assert r.strict_g1 == pytest.approx(base.strict_g1, rel=1e-6)
+        assert r.int_t == pytest.approx(base.int_t, rel=1e-6)
+        assert r.int_g0 == pytest.approx(base.int_g0 * f, rel=1e-6)

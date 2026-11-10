@@ -421,7 +421,9 @@ Returns convention: Y_t = −L_{t+1}, ê_t = −ES_t (forecast made at t).
   solved exactly as a linear programme; given q, the ES part has the first-order condition
   Σ X(e − S)/e² = 0 with S_t = q_t + (Y_t − q_t)·1[Y_t ≤ q_t]/α, solved by iterated weighted
   least squares with step halving (all e_t < 0, loss never rises). The two blocks alternate
-  until the joint loss stops falling. As in esreg, Y is shifted by max(Y, 0) while fitting.
+  until the joint loss stops falling. As in esreg, Y is shifted by max(Y, 0) while fitting;
+  before that, losses and forecasts are divided by sd(loss), so the result does not depend
+  on units (tested at ×1e−5 … ×1e4).
 - *Covariance.* Full misspecification-robust sandwich for (β, γ): the bread includes the
   quantile block (conditional density by Hendricks–Koenker difference quotients), the cross
   blocks in (1[Y ≤ q] − α), and the ES block 1/e² − 2(e − S)/e³; the meat is the outer

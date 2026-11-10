@@ -479,7 +479,12 @@ Format: date · section · change · reason · made before/after seeing affected
      | Student-t(5), log-normal scale | 1,000 / 2,500 / 5,000 | 22.7% / 13.7% / 9.5% | 1.7% / 2.3% / 1.5% |
      | GJR-GARCH-t (project simulator, true forecasts) | 1,000 / 2,500 / 5,000 | 25.7% / 19.0% / 11.0% | 1.0% / 1.0% / 1.0% |
 
-     The strict test's over-size falls steadily with T, as a finite-sample effect would.
+     Rates are over successful fits; unavailable fits were 0–2 per cell (at most 1 strict and
+     2 intercept, all at T ≤ 2,500). The strict test's over-size falls steadily with T, which
+     is compatible with a finite-sample distortion (it does not prove the cause).
+   - *Review round 2 (2026-11-10):* inputs are normalised by sd(loss) before fitting so that
+     availability and tolerances do not depend on units (slopes, Wald and t are invariant;
+     intercepts are scaled back); α ∈ (0, 1) and finite one-dimensional inputs are required.
      Power against ES 20% too small (T = 5,000): 100% for both in the first version; the
      final version's power is checked in the tests (ES = truth/1.5 rejected at p < 0.001).
      No reference implementation (R esreg) was available to compare against; instead a test
