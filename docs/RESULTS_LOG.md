@@ -591,3 +591,50 @@ different from the 1-day one (HAR-FHS and the lasso control ahead of FHS-GJR), b
 headline (no ML model beats FHS-GJR) is not overturned: the direct-quantile ML models stay
 near the bottom.
 
+
+---
+
+## 2026-11-10 — Bayer–Dimitriadis ESR backtest (exploratory, development samples only)
+
+Specification committed first (Addition 9, `2a8ed66`), amended after one simulation and two
+external code-review rounds, all before this run; final code `b1012ef`. Not pre-registered
+and added after the lockbox was opened, so exploratory and development samples only (no
+lockbox ESR table exists). Re-running the development backtests left all 36 existing tables
+(development and lockbox) byte-identical (`cmp`); ESR is a new table (`backtest_esr.csv`).
+All 132 fits (11 models × 3 levels × 4 runs) succeeded for both versions.
+
+Reading rule (Addition 9): the one-sided intercept test is the ESR result. It is
+conservative in simulation (1–2% at nominal 5%), so non-rejection is weak evidence. Strict
+ESR over-rejects a correct model (about 10% at nominal 5% for T ≈ 5,000), so only very small
+strict p-values are informative.
+
+**P1 one-sided intercept ESR: γ̂0 in % (p-value), 1 / 2.5 / 5%** (γ̂0 < 0 = ES understated):
+
+| Model | 1% | 2.5% | 5% |
+|---|---|---|---|
+| FHS-GJR | +0.190 (0.91) | +0.094 (0.88) | +0.042 (0.77) |
+| HAR-FHS | −0.096 (0.27) | −0.104 (0.11) | −0.110 (0.030) |
+| GJR-t | −0.130 (0.18) | −0.135 (0.043) | −0.139 (0.007) |
+| GARCH-t | −0.132 (0.19) | −0.142 (0.045) | −0.164 (0.002) |
+| HS-500 | −0.570 (0.011) | −0.345 (0.006) | −0.195 (0.012) |
+| RF-vol FHS | −0.443 (0.009) | −0.283 (0.004) | −0.190 (0.003) |
+| lasso QR | −0.464 (0.002) | −0.365 (<0.001) | −0.327 (<0.001) |
+| HS-250, EWMA, QRF, GB quantile | all < 0, p < 0.001 | | |
+
+**P1 strict ESR slope γ̂1 on the ES forecast (H0 = 1), 1 / 2.5 / 5%:** FHS-GJR 0.65 / 0.73 /
+0.78 (strict p ≤ 0.0006); GARCH-t and GJR-t 0.72–0.85; HAR-FHS 0.74–0.91; HS-500 0.61–0.68;
+EWMA 0.90–0.97; QRF 0.86–1.05; RF-vol FHS 1.03–1.11; lasso QR 1.22–1.24; GB quantile
+1.44–1.78.
+
+**Rejections at 5% (of 12 cells: P1, P2, P3, P1 rolling × 3 levels), intercept / strict:**
+FHS-GJR 0 / 8; HAR-FHS 3 / 9; GJR-t 9 / 11; lasso QR 9 / 9; GARCH-t 10 / 12; EWMA, GB
+quantile, HS-250, HS-500, RF-vol FHS and QRF 12 / 12.
+
+**Reading:** the intercept test agrees with Z2 and McNeil–Frey: FHS-GJR is the only model
+whose ES is never understated (γ̂0 > 0 in every P1 cell), HAR-FHS is next, and the
+direct-quantile ML models and the baselines understate ES everywhere. The strict test adds
+one new, tentative observation: for the GARCH-family and FHS models the slope is below 1, so
+realised tail losses move less than one-for-one with the ES forecast (ES too high on
+high-forecast days relative to low-forecast days). FHS-GJR's strict p-values are far
+below what the measured over-size alone would produce, but the test is not calibrated, so
+this is noted, not claimed. No headline conclusion changes.
