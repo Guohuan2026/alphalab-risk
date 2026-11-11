@@ -77,3 +77,15 @@ criterion, re-run A/B1/B2, and report the scl_sp results as motivation.
 **Action:** NOT implemented. This changes the pre-registered estimator, which CLAUDE.md
 reserves for the owner ("Changing the pre-registered research design"). Escalated in the
 morning summary. No overnight run launched.
+
+## 2026-11-11 — amendment 10: which "ind" variant to freeze (owner approved the switch to ind)
+
+**Finding:** esreg's `sigma_matrix`/`lambda_matrix` always call `cdf_at_quantile` (the same
+location-scale fit) and use it when misspec = TRUE; all misspecification terms are multiples
+of (cdf − α). So sigma_est = "ind" alone does not remove the scale fit.
+**Question to Codex:** freeze V1 (ind, misspec = TRUE) or V2 (ind, misspec = FALSE)?
+**Codex:** freeze V2 as an explicitly clarified amendment (it fulfils the stated purpose);
+report V1 as a secondary sensitivity with its failure rule; distinguish the ESR coefficient
+null from correct specification (V2 imposes cdf = α; adequacy to be shown by simulation);
+check against R esback/esreg; apply the gate to V2, never pick whichever variant passes.
+**Action:** adopted; frozen in RESEARCH_DESIGN amendment 10 before any amended simulation ran.

@@ -77,6 +77,7 @@ class SimSettings:
     workers: int = 4
     nice: int = 10
     extra: dict = field(default_factory=dict)
+    cov: str = "scl_sp"  # covariance variant (es.COV_VARIANTS); amendment 10
 
 
 # ---------------------------------------------------------------- exact forecasts
@@ -134,6 +135,13 @@ def _rep_seed(s: SimSettings, d: Design, r: int) -> np.random.SeedSequence:
 
 
 def one_replication(s: SimSettings, d: Design, r: int) -> dict:
+    from alphalab.backtest.es import cov_variant
+
+    with cov_variant(s.cov):
+        return _one_replication(s, d, r)
+
+
+def _one_replication(s: SimSettings, d: Design, r: int) -> dict:
     rng = np.random.default_rng(_rep_seed(s, d, r))
     loss, var, es = simulate(d, s.n, rng, s.burn)
     out = {"rep": r, "ok": False}
@@ -183,6 +191,8 @@ def _init(nice: int) -> None:
 def _settings_doc(s: SimSettings) -> dict:
     doc = asdict(s)
     doc["designs"] = [asdict(d) for d in s.designs]
+    if doc["cov"] == "scl_sp":  # keep pre-amendment settings files byte-compatible
+        del doc["cov"]
     return doc
 
 
@@ -298,13 +308,16 @@ def summarize(root: Path, s: SimSettings, level: float = 0.05) -> pd.DataFrame:
         df = load(root, d)
         if df.empty:
             continue
-        flags = pd.DataFrame([degenerate_flags(s, d, int(r)) for r in df.rep]).set_index("rep")
-        df = df.join(flags, on="rep")
-        full_bad = df.full_strict | df.full_int
-        df.loc[full_bad, "ok"] = False  # invalid covariance: replication unavailable
-        for b in s.blocks:  # degenerate draws are failed draws, never observations
-            df.loc[df[f"draw_strict_b{b}"].astype(bool), f"wstar_b{b}"] = np.nan
-            df.loc[df[f"draw_int_b{b}"].astype(bool), f"tstar_b{b}"] = np.nan
+        if s.cov == "scl_sp":  # post-hoc masking only for the pre-amendment estimator
+            flags = pd.DataFrame([degenerate_flags(s, d, int(r)) for r in df.rep])
+            df = df.join(flags.set_index("rep"), on="rep")
+            full_bad = df.full_strict | df.full_int
+            df.loc[full_bad, "ok"] = False  # invalid covariance: replication unavailable
+            for b in s.blocks:  # degenerate draws are failed draws, never observations
+                df.loc[df[f"draw_strict_b{b}"].astype(bool), f"wstar_b{b}"] = np.nan
+                df.loc[df[f"draw_int_b{b}"].astype(bool), f"tstar_b{b}"] = np.nan
+        else:  # amendment 10: no scale fit (V2) or failures raised inside the fit (V1)
+            full_bad = pd.Series(False, index=df.index)
         ok = df[df.ok.astype(bool)]
         base = {
             "degenerate_full_reps": int(full_bad.sum()),

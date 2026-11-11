@@ -98,6 +98,12 @@ def main(argv: list[str] | None = None) -> int:
             sp.add_argument("--n", type=int, default=d.n, help="sample length")
             sp.add_argument("--reps", type=int, default=d.reps, help="Monte Carlo replications")
             sp.add_argument("--workers", type=int, default=d.workers, help="processes")
+            sp.add_argument(
+                "--cov",
+                default=d.cov,
+                choices=["scl_sp", "ind_nomis", "ind_mis"],
+                help="ESR covariance variant (amendment 10; default = pre-registered scl_sp)",
+            )
             sp.add_argument("--summarize", action="store_true", help="write rejection rates")
         if name in ("forecast", "backtest"):
             sp.add_argument(
@@ -222,8 +228,9 @@ def main(argv: list[str] | None = None) -> int:
 
         from alphalab.backtest import esr_sim as es_
 
-        s = es_.SimSettings(n=args.n, reps=args.reps, workers=args.workers)
-        root = Path(cfg.data_dir) / "results" / "esr_sim" / f"n{s.n}_reps{s.reps}_seed{s.seed}"
+        s = es_.SimSettings(n=args.n, reps=args.reps, workers=args.workers, cov=args.cov)
+        tag = "" if s.cov == "scl_sp" else f"_cov-{s.cov}"  # separate folder per variant
+        root = Path(cfg.data_dir) / "results" / "esr_sim" / f"n{s.n}_reps{s.reps}_seed{s.seed}{tag}"
         if args.summarize:
             t = es_.summarize(root, s)
             t.to_csv(root / "rejection_rates.csv", index=False)
