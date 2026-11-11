@@ -271,16 +271,26 @@ def _fit_joint(
     raise ESRFitError("joint FZ0 estimation did not converge")
 
 
-def _below(y: np.ndarray, q: np.ndarray) -> np.ndarray:
-    """1[y < q] with observations ON the fitted quantile counted as not below.
+TIE_RTOL = 1e-7  # tie band for "at or below the fitted quantile", in normalised units
 
-    An LP quantile fit interpolates a few observations (residual ~1e-15); whether they land
-    at, above or below q then depends on the last bits, which made the covariance differ
-    across platforms (2026-11-10). The tolerance is far above the LP's feasibility error
-    and far below the spacing of continuous data in normalised units.
+
+def _at_or_below(resid: np.ndarray, scale: float) -> np.ndarray:
+    """1[resid <= 0] with a tie band: resid <= TIE_RTOL * (1 + scale).
+
+    Why: an LP quantile fit interpolates a few observations exactly (y = q in exact
+    arithmetic), but their computed residuals are ~±1e-15, so a raw ``<= 0`` flips with the
+    last bits (it moved the Wald by up to 5% between macOS and Linux, 2026-11-10). Every
+    definition involved (S_t, esreg's tail selection, the empirical CDF) uses 1[Y <= q], so
+    exact arithmetic counts these points as "at or below"; the band reproduces that.
+
+    Approximation (documented, not a guarantee): a genuine observation within the band above
+    q is also counted. The band is ~5 orders above the LP's feasibility error and, for
+    continuous data with density f, catches a genuine point with probability about
+    2·n·f·tol (~1e-4 at n = 6,500); it changes counts by at most the few points inside it.
+    Other hard boundaries (bandwidth bins, the identification threshold) remain, so results
+    are not invariant to the last bits in every possible sample.
     """
-    tol = 1e-7 * (1.0 + float(np.max(np.abs(y))))
-    return y < q - tol
+    return resid <= TIE_RTOL * (1.0 + scale)
 
 
 def _hall_sheather(n: int, alpha: float) -> float:
@@ -428,9 +438,10 @@ def _cond_trunc_var(u: np.ndarray, x: np.ndarray, approach: str) -> tuple[np.nda
     variance of u[u <= 0]) exactly when esreg does. Returns (cv, approach actually used)."""
     from scipy import stats
 
-    if np.sum(u <= 0) <= 2:
+    tail = _at_or_below(u, float(np.max(np.abs(u))))  # same tie policy as everywhere else
+    if np.sum(tail) <= 2:
         raise ESRFitError("not enough negative quantile residuals")
-    ind = np.full(len(u), float(np.var(u[u <= 0], ddof=1)))
+    ind = np.full(len(u), float(np.var(u[tail], ddof=1)))
     if approach == "ind":
         return ind, "ind"
     try:
@@ -469,10 +480,10 @@ def _cdf_at_quantile(y: np.ndarray, x: np.ndarray, q: np.ndarray) -> np.ndarray:
     """esreg cdf_at_quantile: empirical CDF of location-scale standardised y at q."""
     mu, sig = _cond_mean_sigma(y, x)
     v = np.sort((y - mu) / sig)
-    # Points the LP fit interpolates sit exactly at q; count them as "at or below" (R's
-    # ecdf does when the equality is exact) regardless of the last bits.
+    # cdf_i = share of j with v_j - z_i <= 0, with the tie band of _at_or_below (points the
+    # LP fit interpolates sit exactly at q; R's ecdf counts them when equality is exact).
     z = (q - mu) / sig
-    tol = 1e-9 * (1.0 + float(np.max(np.abs(v))))
+    tol = TIE_RTOL * (1.0 + float(np.max(np.abs(v))))
     return np.searchsorted(v, z + tol, side="right") / len(v)
 
 
@@ -549,7 +560,8 @@ def _strict_fit(
     approach)."""
     c = float(y.max())
     beta, g = _fit_joint(y - c, x, x, alpha, np.array([-max(c, 0.0), 1.0]))
-    n_q = int(np.sum(~_below(x @ beta, y - c)))  # at or below the fitted quantile
+    ys = y - c
+    n_q = int(np.sum(_at_or_below(ys - x @ beta, float(np.max(np.abs(ys))))))
     if n_q < min_tail:
         raise ESRFitError(f"only {n_q} observations at or below the fitted quantile")
     cov, approach = _joint_cov(y - c, x, x, alpha, beta, g)
@@ -567,7 +579,8 @@ def _intercept_fit(
     ones = np.ones((n, 1))
     start = float(np.min(z - cz)) - float(np.std(z)) - 1e-12
     beta, g = _fit_joint(z - cz, x, ones, alpha, np.array([start]))
-    n_tail = int(np.sum(~_below(x @ beta, z - cz)))  # at or below the fitted quantile
+    zs = z - cz
+    n_tail = int(np.sum(_at_or_below(zs - x @ beta, float(np.max(np.abs(zs))))))
     if n_tail < min_tail:
         raise ESRFitError(f"only {n_tail} observations at or below the fitted quantile")
     cov, approach = _joint_cov(z - cz, x, ones, alpha, beta, g)
@@ -641,8 +654,13 @@ def esr_backtest(loss, var, es, alpha: float, min_tail: int = 10) -> ESRResult:
     # Work in normalised units (divide by ``unit``) so tolerances and the conditioning check do not
     # depend on whether returns are in decimals, percent or basis points. Slopes, Wald and t
     # statistics are invariant; intercepts are multiplied back by ``unit``.
-    unit = float(np.std(loss)) or float(np.mean(es))
-    y, ehat = -loss / unit, -es / unit
+    with np.errstate(over="ignore", invalid="ignore"):
+        unit = float(np.std(loss)) or float(np.mean(es))
+        y, ehat = -loss / unit, -es / unit
+    if not (
+        np.isfinite(unit) and unit > 0 and np.all(np.isfinite(y)) and np.all(np.isfinite(ehat))
+    ):
+        raise ValueError("inputs too large to normalise (sd or mean overflows)")
     # The slope is identified only if the forecast varies (relative to its own size).
     identified = np.std(ehat) > 1e-8 * np.mean(np.abs(ehat))
     x = np.column_stack([np.ones(n), ehat]) if identified else np.ones((n, 1))

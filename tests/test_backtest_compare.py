@@ -451,3 +451,44 @@ def test_esr_stable_under_last_bit_perturbations():
         r = esr_backtest(loss * (1 + pr.normal(size=2000) * 1e-15), v * s, e * s, 0.025)
         assert r.strict_wald == pytest.approx(base.strict_wald, rel=1e-9)
         assert r.int_t == pytest.approx(base.int_t, rel=1e-9)
+
+
+def test_esr_ind_fallback_stable_under_last_bit_perturbations():
+    """Review round 3: the 'ind' variance selects the tail with the same tie policy. A
+    constant ES forecast forces esreg's iid density + ind variance in the intercept test."""
+    from alphalab.backtest import esr_backtest
+
+    loss = np.random.default_rng(41).standard_t(5, 2000) * 0.01
+    var, es = np.full(2000, 0.02), np.full(2000, 0.03)
+    base = esr_backtest(loss, var, es, 0.025)
+    assert base.int_status == "ok" and np.isfinite(base.int_t)  # ind is esreg's own choice
+    pr = np.random.default_rng(42)
+    for _ in range(12):
+        r = esr_backtest(loss * (1 + pr.normal(size=2000) * 1e-15), var, es, 0.025)
+        assert r.int_t == pytest.approx(base.int_t, rel=1e-9)
+        assert r.n_tail == base.n_tail
+
+
+def test_tie_band_is_documented_behaviour():
+    """Points within TIE_RTOL*(1+scale) above q count as 'at or below' (the documented
+    approximation); points beyond the band do not. Same rule in the empirical CDF."""
+    from alphalab.backtest.es import TIE_RTOL, _at_or_below, _cdf_at_quantile
+
+    tol = TIE_RTOL * (1 + 1.0)
+    resid = np.array([-1.0, -1e-15, 0.0, 1e-15, 0.4 * tol, 3 * tol, 1.0])
+    assert _at_or_below(resid, 1.0).tolist() == [True, True, True, True, True, False, False]
+    rng = np.random.default_rng(43)
+    x = np.column_stack([np.ones(400), rng.uniform(1, 2, 400)])
+    y = rng.normal(size=400) * x[:, 1]
+    q = y.copy()  # every point sits exactly on "its" quantile: ties by construction
+    cdf_exact = _cdf_at_quantile(y, x, q)
+    cdf_bits = _cdf_at_quantile(y, x, q * (1 + rng.normal(size=400) * 1e-15))
+    assert np.array_equal(cdf_exact, cdf_bits)
+
+
+def test_esr_rejects_inputs_that_overflow_normalisation():
+    from alphalab.backtest import esr_backtest
+
+    loss = np.random.default_rng(44).normal(size=100) * 1e306
+    with pytest.raises(ValueError, match="normalise"):
+        esr_backtest(loss, np.full(100, 1e306), np.linspace(1e306, 1.7e308, 100), 0.05)

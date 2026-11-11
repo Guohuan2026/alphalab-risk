@@ -86,6 +86,7 @@ class Cell:
 
 # ---------------------------------------------------------------- building the cells
 def _normalise(loss, es):
+    """Same normalisation as esr_backtest (which has already validated the inputs)."""
     loss = np.asarray(loss, dtype=float)
     es = np.asarray(es, dtype=float)
     unit = float(np.std(loss)) or float(np.mean(es))

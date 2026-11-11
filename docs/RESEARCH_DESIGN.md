@@ -456,9 +456,13 @@ Format: date · section · change · reason · made before/after seeing affected
      Deviations from esreg, all numerical: (a) the location-scale ML fit is iterated to
      convergence with an analytic gradient (esreg's single BFGS run stops early, by 2 to
      ~9,500 log-likelihood units on our series); (b) the kernel density is evaluated exactly
-     at R's 512 grid points instead of by FFT binning; (c) observations the LP fit
-     interpolates are counted as "at or below q" in the empirical CDF regardless of the last
-     floating-point bits.
+     at R's 512 grid points instead of by FFT binning; (c) tail membership (n_tail, the "ind"
+     variance's tail, the empirical CDF) uses one tie band, |resid| ≤ 1e−7·(1 + scale) in
+     normalised units counts as "at or below q", so observations the LP fit interpolates
+     (y = q exactly) are classified as in exact arithmetic. Approximation: a genuine
+     observation inside the band is also counted (probability ≈ 2·n·f·tol, ~1e−4 here);
+     other hard boundaries remain, so last-bit invariance is not guaranteed in every sample.
+     (d) Inputs whose sd or mean overflows are rejected.
    - *Strict ESR (two-sided):* quantile and ES regressors (1, ê_t). H0: (γ0, γ1) = (0, 1);
      Wald statistic, χ²(2) p-value.
    - *One-sided intercept ESR:* Z_t = Y_t − ê_t; quantile regressors (1, ê_t), ES regressor 1.
