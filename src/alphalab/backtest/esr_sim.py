@@ -266,6 +266,28 @@ def load(root: Path, d: Design) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def degenerate_flags(s: SimSettings, d: Design, r: int) -> dict:
+    """Regenerate replication r exactly and flag esreg's degenerate location-scale start
+    (Addition 9, amendments 7-8) in the full sample and in each block's bootstrap draw."""
+    from alphalab.backtest.esr_bootstrap import _normalise, degenerate_start
+
+    rng = np.random.default_rng(_rep_seed(s, d, r))
+    loss, _, es = simulate(d, s.n, rng, s.burn)
+    y, eh = _normalise(loss, es)
+
+    def bad(yy, ee):
+        x = np.column_stack([np.ones(len(yy)), ee])
+        z = yy - ee
+        return degenerate_start(yy - yy.max(), x), degenerate_start(z - z.max(), x)
+
+    fs, fi = bad(y, eh)
+    out = {"rep": r, "full_strict": fs, "full_int": fi}
+    for b in s.blocks:
+        ix = chunk_indices(f"{d.name}_{r}", s.seed, b, 1, s.n, b)[0]
+        out[f"draw_strict_b{b}"], out[f"draw_int_b{b}"] = bad(y[ix], eh[ix])
+    return out
+
+
 def summarize(root: Path, s: SimSettings, level: float = 0.05) -> pd.DataFrame:
     """Null rejection rates per design and method. ``*_mc_sd`` resamples replication rows
     (including the warp-speed critical value); ``binom_sd`` is the binomial reference only.
@@ -276,8 +298,16 @@ def summarize(root: Path, s: SimSettings, level: float = 0.05) -> pd.DataFrame:
         df = load(root, d)
         if df.empty:
             continue
+        flags = pd.DataFrame([degenerate_flags(s, d, int(r)) for r in df.rep]).set_index("rep")
+        df = df.join(flags, on="rep")
+        full_bad = df.full_strict | df.full_int
+        df.loc[full_bad, "ok"] = False  # invalid covariance: replication unavailable
+        for b in s.blocks:  # degenerate draws are failed draws, never observations
+            df.loc[df[f"draw_strict_b{b}"].astype(bool), f"wstar_b{b}"] = np.nan
+            df.loc[df[f"draw_int_b{b}"].astype(bool), f"tstar_b{b}"] = np.nan
         ok = df[df.ok.astype(bool)]
         base = {
+            "degenerate_full_reps": int(full_bad.sum()),
             "design": d.name,
             "n": s.n,
             "reps_done": len(df),

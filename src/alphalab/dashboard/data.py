@@ -130,6 +130,27 @@ def table(run: Run, name: str, lockbox: bool = False) -> pd.DataFrame | None:
     return pd.read_csv(f) if f.exists() else None
 
 
+def esr_with_quarantine(esr: pd.DataFrame, screen: pd.DataFrame | None) -> pd.DataFrame:
+    """ESR table with quarantined cells' statistics blanked (Addition 9, amendment 8).
+
+    Without a screen file every lasso-QR row is blanked as well (fail safe: the model is
+    quarantined until a corrected estimator is validated)."""
+    out = esr.copy()
+    stat_cols = [
+        c
+        for c in out.columns
+        if c not in ("model", "alpha", "n", "n_tail") and not c.endswith("_status")
+    ]
+    if screen is not None:
+        bad = screen.loc[screen.quarantined.astype(bool), ["model", "alpha"]]
+        mask = out.set_index(["model", "alpha"]).index.isin(bad.set_index(["model", "alpha"]).index)
+    else:
+        mask = out.model.eq("linqr_l1").to_numpy()
+    out.loc[mask, stat_cols] = float("nan")
+    out["quarantined"] = mask
+    return out
+
+
 def returns(run: Run) -> pd.Series | None:
     if run.processed is None or not (run.processed / "portfolio_daily.parquet").exists():
         return None

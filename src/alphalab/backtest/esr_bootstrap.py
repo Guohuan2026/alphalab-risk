@@ -504,6 +504,45 @@ def _degenerate_draws(cell: Cell, idx: np.ndarray) -> tuple[np.ndarray, np.ndarr
     return ds, di
 
 
+# Models whose ESR results are unavailable until a corrected, validated estimator exists.
+QUARANTINE = {
+    "linqr_l1": (
+        "lasso QR: esreg's location-scale start is degenerate (P1) and its linear scale model "
+        "fits poorly; unavailable until the corrected estimator is validated (Addition 9, "
+        "amendment 8)"
+    ),
+}
+
+
+def screen(cells: list[Cell]) -> pd.DataFrame:
+    """Per cell: does the full sample hit esreg's degenerate start, and is it quarantined?"""
+    rows = []
+    for c in cells:
+        model = c.key.rsplit("_", 1)[0]
+        n = len(c.y)
+        x = np.column_stack([np.ones(n), c.ehat])
+        z = c.y - c.ehat
+        ds = degenerate_start(c.y - c.y.max(), x)
+        di = degenerate_start(z - z.max(), x)
+        reasons = []
+        if ds or di:
+            reasons.append("full-sample location-scale start degenerate (covariance invalid)")
+        if model in QUARANTINE:
+            reasons.append(QUARANTINE[model])
+        rows.append(
+            {
+                "cell": c.key,
+                "model": model,
+                "alpha": c.alpha,
+                "strict_full_sample_degenerate": ds,
+                "int_full_sample_degenerate": di,
+                "quarantined": bool(reasons),
+                "reason": "; ".join(reasons),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def summarize(root: Path, s: BootstrapSettings, cells: list[Cell] | None = None) -> pd.DataFrame:
     """Bootstrap p-values per cell, from finished chunks. p-values only for complete cells
     with at most 5% failed resamples (esback's rule).
@@ -537,6 +576,8 @@ def summarize(root: Path, s: BootstrapSettings, cells: list[Cell] | None = None)
             "wald0": m["wald0"],
             "t0": m["t0"],
         }
+        quarantined = m["cell"].rsplit("_", 1)[0] in QUARANTINE
+        row["quarantined"] = quarantined
         cell = by_key.get(m["cell"])
         full_bad = {"strict": False, "int": False}
         if cell is not None:
@@ -565,7 +606,13 @@ def summarize(root: Path, s: BootstrapSettings, cells: list[Cell] | None = None)
         ):
             fail = float(np.mean(~np.isfinite(xs))) if len(xs) else np.nan
             ok = xs[np.isfinite(xs)]
-            usable = complete and len(ok) > 0 and fail <= MAX_FAIL_SHARE and not full_bad[name]
+            usable = (
+                complete
+                and len(ok) > 0
+                and fail <= MAX_FAIL_SHARE
+                and not full_bad[name]
+                and not quarantined
+            )
             # strict: share of W* >= W0; intercept (one-sided, lower tail): share of t* <= t0
             p_boot = np.mean(ok >= observed) if upper else np.mean(ok <= observed)
             row[f"{name}_fail_share"] = fail
@@ -581,6 +628,7 @@ __all__ = [
     "ESRFitError",
     "cells_from_config",
     "degenerate_start",
+    "screen",
     "chunk_bounds",
     "chunk_indices",
     "make_cell",

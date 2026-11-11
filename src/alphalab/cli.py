@@ -77,6 +77,9 @@ def main(argv: list[str] | None = None) -> int:
             mode.add_argument(
                 "--diagnose", action="store_true", help="serial dependence of the ESR scores"
             )
+            mode.add_argument(
+                "--screen", action="store_true", help="degenerate-start check and quarantine"
+            )
         if name == "esr-sim":
             from alphalab.backtest.esr_sim import SimSettings as _SS
 
@@ -162,7 +165,13 @@ def main(argv: list[str] | None = None) -> int:
             import re
 
             cells = [c for c in cells if re.search(args.only, c.key)]
-        if args.diagnose:
+        if args.screen:
+            t = eb.screen(cells)
+            out = root.parent / "backtest_esr_screen.csv"
+            t.to_csv(out, index=False)
+            print(t.drop(columns="reason").to_string(index=False))
+            print(f"wrote {out}")
+        elif args.diagnose:
             t = pd.DataFrame([eb.score_dependence(c) for c in cells])
             out = root.parent / "backtest_esr_dependence.csv"
             t.to_csv(out, index=False)

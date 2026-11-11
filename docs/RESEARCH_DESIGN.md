@@ -596,3 +596,41 @@ Format: date · section · change · reason · made before/after seeing affected
      given the forecast. Its caveat on studentisation is adopted: iid studentisation inside
      a block bootstrap is first-order valid *conditionally* on stationarity, mixing,
      moment and regularity conditions; this is a justification, not an ESR-specific proof.
+     **Amendment 8 (2026-11-10, ~23:20 EST; before any size-simulation result was read
+     and before any bootstrap p-value was summarised): lasso QR quarantine, correction
+     plan and GO/NO-GO rules.**
+     (a) *Diagnosis of the invalid scale (full samples):* numerical initialisation failure,
+     confirmed: esreg's start is degenerate for P1 lasso QR (OLS-fitted minimum sd −0.12 to
+     −0.17), and from a valid start (minimum sd 0.001) the ML fit converges to an interior
+     optimum (minimum fitted sd 0.064–0.072). Identification problem: ruled out (all ES
+     forecasts distinct; coefficient of variation 0.41–0.44, like QRF; interior optimum).
+     Estimator limitation: present: the linear scale model fits lasso QR worse than a
+     log-linear one at 2.5% and 5% (by 21–34 log-likelihood units; FHS-GJR the reverse,
+     by > 100), with the fitted sd at 9% of its median at the small-ES end, so lasso's
+     covariance leans on a poor auxiliary model.
+     (b) *Quarantine:* every lasso QR ESR result (asymptotic and bootstrap, all portfolios
+     and levels) is unavailable until (d) is met, as is any cell whose full sample hits the
+     degenerate start (`esr-bootstrap --screen`, `backtest_esr_screen.csv`; the dashboard
+     and the bootstrap summary blank them). Failed or degenerate bootstrap draws are never
+     used as observations, and their frequency is never read as evidence against a model.
+     (c) *Correction (after the current-version runs finish; new estimator version):* the
+     starting sd is raised to at least 0.001 (b2_0 += max(0, 0.001 − min fitted)), which
+     differs from esreg only when esreg's start is degenerate; and any non-positive or
+     non-finite fitted sd, or non-finite standardised value, raises a fit error (failed draw).
+     (d) *Leaving quarantine (all required):* (1) for every cell whose start is not
+     degenerate, the corrected code reproduces the current statistics and saved draws bit
+     for bit; (2) for every lasso cell, the corrected ML optimum is interior (min/median
+     fitted sd ≥ 0.05); (3) the 5% decision of each lasso test is the same under esreg's
+     "scl_sp" and "ind" variance approaches; (4) R esreg with the same start correction
+     agrees within 5% on Wald and t. Failing (3) or (4) keeps the cell NO-GO and reports it
+     as estimator-sensitive. Then only lasso cells are rerun (main run, B = 999, block
+     ⌈T^{1/3}⌉) under the new version; other cells' draws are reused only if (1) holds.
+     (e) *GO/NO-GO.* Method level, per test (strict, intercept): the block bootstrap is GO
+     if amendment 6(ii) passes; restricted GO (short-memory dependence only) if it fails in
+     B2 only; NO-GO otherwise. Asymptotic p-values are NO-GO as tests unless their simulated
+     rejection rate is also ≤ 6.4% in A, B1 and B2. Cell level (portfolio × model × level ×
+     test): GO requires a GO method, a complete bootstrap with ≤ 5% failed draws after
+     masking, no quarantine and a non-degenerate full sample; a cell that is
+     block-sensitive (6(iii)) is "inconclusive". A model is GO for a test where all of its
+     cells are GO. Every result keeps its label: exploratory, development sample, added
+     after the lockbox was opened; none of it is held-out evidence.

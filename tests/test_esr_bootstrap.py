@@ -164,3 +164,40 @@ def test_degenerate_start_matches_the_port_and_fails_draws(tmp_path, cell):
     other = eb.make_cell(cell.key, *_series(seed=8), 0.05)
     with pytest.raises(RuntimeError, match="hash"):
         eb.summarize(tmp_path, s, [other])
+
+
+def test_screen_flags_quarantined_models(cell):
+    lasso = eb.Cell(
+        "linqr_l1_0.05",
+        *[
+            getattr(cell, f)
+            for f in ("alpha", "y", "ehat", "g_hat", "g0_hat", "wald0", "t0", "data_sha256")
+        ],
+    )
+    t = eb.screen([cell, lasso]).set_index("cell")
+    assert not t.loc["sim_0.05", "quarantined"]
+    assert t.loc["linqr_l1_0.05", "quarantined"] and "lasso" in t.loc["linqr_l1_0.05", "reason"]
+
+
+def test_dashboard_blanks_quarantined_esr_rows():
+    import pandas as pd
+
+    from alphalab.dashboard.data import esr_with_quarantine
+
+    esr = pd.DataFrame(
+        {
+            "model": ["fhs_gjr", "linqr_l1"],
+            "alpha": [0.05, 0.05],
+            "strict_p": [0.3, 0.01],
+            "int_p": [0.6, 0.02],
+            "strict_status": ["ok", "ok"],
+        }
+    )
+    out = esr_with_quarantine(esr, None)  # no screen file: lasso blanked (fail safe)
+    assert out.quarantined.tolist() == [False, True]
+    assert out.loc[1, ["strict_p", "int_p"]].isna().all() and out.loc[0, "int_p"] == 0.6
+    scr = pd.DataFrame(
+        {"model": ["fhs_gjr", "linqr_l1"], "alpha": [0.05, 0.05], "quarantined": [True, False]}
+    )
+    out = esr_with_quarantine(esr, scr)
+    assert out.quarantined.tolist() == [True, False]

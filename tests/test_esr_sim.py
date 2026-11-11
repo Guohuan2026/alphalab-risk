@@ -57,6 +57,17 @@ def test_run_is_resumable_and_reproducible(tmp_path):
     assert json.loads(f.read_text()) == before
     t = es_.summarize(tmp_path, s)
     assert set(t.method) == {"asymptotic", "iid bootstrap", "block bootstrap"}
+    assert (t.degenerate_full_reps == 0).all()  # well-behaved design: start never degenerate
+    fl = es_.degenerate_flags(s, s.designs[0], 0)
+    assert set(fl) == {
+        "rep",
+        "full_strict",
+        "full_int",
+        "draw_strict_b1",
+        "draw_int_b1",
+        "draw_strict_b10",
+        "draw_int_b10",
+    }
     with pytest.raises(RuntimeError, match="other settings"):
         es_.run(tmp_path, es_.SimSettings(designs=s.designs, n=600, reps=6, batch=2, workers=1))
 

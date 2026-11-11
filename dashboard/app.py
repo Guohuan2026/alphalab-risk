@@ -296,6 +296,7 @@ with tabs[2]:
                 ecols += ["z2", "p_z2"]
             esr = D.table(run, "backtest_esr", lockbox)  # development samples only (Addition 9)
             if esr is not None:
+                esr = D.esr_with_quarantine(esr, D.table(run, "backtest_esr_screen", lockbox))
                 e = e.merge(
                     esr[esr.alpha == alpha][["model", "strict_p", "int_p"]],
                     on="model",
@@ -346,6 +347,12 @@ with tabs[2]:
                     "asymptotic and ignore serial correlation in the scores, which is present "
                     "in most cells, so they are descriptive and too small (LIMITATIONS #17)."
                 )
+                q = esr.loc[esr.quarantined, "model"].map(D.label).unique()
+                if len(q):
+                    st.caption(
+                        "ESR unavailable (quarantined until a corrected estimator is "
+                        f"validated): {', '.join(q)}."
+                    )
         if dm is not None:
             st.subheader("Diebold–Mariano on FZ0 (row vs column; negative = row better)")
             d = dm[dm.alpha == alpha]

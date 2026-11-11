@@ -114,10 +114,12 @@ they can distort conclusions.
       noted below. The bootstrap p-values also rest on a conditional first-order argument
       (stationarity, mixing, moments) checked by simulation, not proved for this estimator.
     - *Covariance depends on a location-scale model.* esreg's variance estimator (ported here)
-      models Y's conditional mean and scale as linear in the forecast. Where that fit is
-      poor or has several optima (lasso QR, whose ES forecasts are heavily floored and tied),
-      results can differ between implementations: up to about 40% in the intercept t-statistic
-      against esreg for lasso QR, against < 5% for every other model.
+      models Y's conditional mean and scale as linear in the forecast. For lasso QR that
+      linear scale fits worse than a log-linear one and esreg's start for it is degenerate
+      on P1 (its ES forecasts are continuous and varied: an earlier note here calling them
+      "heavily floored and tied" was wrong). Lasso QR's ESR results are quarantined
+      (Addition 9, amendment 8); before that, they differed from esreg by up to about 40%
+      in the intercept t, against < 5% for every other model.
     - *Reference differences:* the port matches esreg to a median 0.5% (Wald) when esreg's
       own location-scale optimisation is run to convergence. Unmodified esreg stops that
       optimisation early, which alone changes its Wald by up to ~60% on some series; our
