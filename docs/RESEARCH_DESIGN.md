@@ -570,3 +570,29 @@ Format: date · section · change · reason · made before/after seeing affected
      (iv) *Code audit* of null imposition (centring at γ̂, not at the null), parameter
      re-estimation per resample, studentisation and resampling, plus an independent
      review by Codex of the bootstrap and the esreg port.
+     **Amendment 7 (2026-11-10, ~22:30 EST; before any bootstrap p-value was summarised or
+     any simulation result was read). Codex review round 4: no major issues; three minors,
+     all accepted.** (a) *Degenerate location-scale start.* esreg's starting value for the
+     scale regression subtracts min(0.001, min fitted) from the intercept, which puts the
+     smallest fitted sd at ~0 whenever it is below 0.001 (the evident intent is "at least
+     0.001"); the likelihood is then undefined, both optimisers fail, the start is kept and
+     the covariance divides by ~0. Our port reproduced this and produced finite but
+     meaningless statistics instead of failures. Frequency: 3 of 132 full-sample cells (P1
+     lasso QR, all levels) and, among the main run's resamples, 79–85% for those cells,
+     29% for P1-rolling lasso QR 5%, ~3% for P3 QRF 2.5/5% and ≤ 0.4% elsewhere. Rule:
+     because the condition depends only on the resample (the quantile and ES forecast lie
+     in the regressor span), `summarize` recomputes it for every saved draw and counts
+     affected draws as failed; a cell whose full sample is affected gets no bootstrap
+     p-value, and its asymptotic ESR values are unavailable (P1 lasso QR). The estimator
+     itself (`es.py`) will be changed to raise on an invalid sd after the main run, with a
+     new estimator version, so the running job's draws are not mixed. (b) *Simulation
+     uncertainty:* Monte Carlo sds are computed by resampling whole replications and
+     recomputing the pooled warp-speed critical value (the binomial sd ignores that common
+     critical value); the amendment-6 threshold of 6.4% is kept unchanged. (c) *Simulation
+     failures:* an empty pool of bootstrap draws gives "unavailable", and a method with
+     more than 5% failed draws is marked unusable instead of reported as a size.
+     Codex confirmed: centring, tail directions, per-draw refitting, circular-block
+     inclusion, the esreg Λ/Σ algebra and signs, and that designs A/B satisfy the ESR null
+     given the forecast. Its caveat on studentisation is adopted: iid studentisation inside
+     a block bootstrap is first-order valid *conditionally* on stationarity, mixing,
+     moment and regularity conditions; this is a justification, not an ESR-specific proof.

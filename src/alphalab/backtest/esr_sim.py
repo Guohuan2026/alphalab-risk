@@ -223,11 +223,40 @@ def run(root: Path, s: SimSettings, log_path: Path | None = None) -> dict:
 
 # ---------------------------------------------------------------- results
 def warp_p(stat: np.ndarray, star: np.ndarray, upper: bool) -> np.ndarray:
-    """Warp-speed bootstrap p-values: share of all bootstrap draws as extreme as each stat."""
+    """Warp-speed bootstrap p-values: share of all finite bootstrap draws as extreme as each
+    stat. NaN where the stat is not finite or the pool of draws is empty."""
+    stat = np.asarray(stat, dtype=float)
     star = np.sort(star[np.isfinite(star)])
+    if len(star) == 0:
+        return np.full(stat.shape, np.nan)
     if upper:
-        return 1.0 - np.searchsorted(star, stat, side="left") / len(star)
-    return np.searchsorted(star, stat, side="right") / len(star)
+        p = 1.0 - np.searchsorted(star, stat, side="left") / len(star)
+    else:
+        p = np.searchsorted(star, stat, side="right") / len(star)
+    return np.where(np.isfinite(stat), p, np.nan)
+
+
+def warp_rejection(
+    stat: np.ndarray, star: np.ndarray, upper: bool, level: float, n_boot: int = 500, seed: int = 0
+) -> tuple[float, float]:
+    """Warp-speed rejection rate and its Monte Carlo sd. The sd resamples whole replication
+    rows (stat, star) and recomputes the pooled critical value each time, so it includes the
+    uncertainty of the common critical value (the binomial sd does not)."""
+    stat, star = np.asarray(stat, dtype=float), np.asarray(star, dtype=float)
+    keep = np.isfinite(stat)
+    stat, star = stat[keep], star[keep]
+    if len(stat) == 0 or not np.isfinite(star).any():
+        return float("nan"), float("nan")
+    rate = float(np.mean(warp_p(stat, star, upper) < level))
+    rng = np.random.default_rng(seed)
+    reps = []
+    for _ in range(n_boot):
+        i = rng.integers(0, len(stat), len(stat))
+        reps.append(np.mean(warp_p(stat[i], star[i], upper) < level))
+    return rate, float(np.std(reps, ddof=1))
+
+
+MAX_BOOT_FAIL = 0.05  # same rule as the real-data bootstrap
 
 
 def load(root: Path, d: Design) -> pd.DataFrame:
@@ -238,39 +267,58 @@ def load(root: Path, d: Design) -> pd.DataFrame:
 
 
 def summarize(root: Path, s: SimSettings, level: float = 0.05) -> pd.DataFrame:
+    """Null rejection rates per design and method. ``*_mc_sd`` resamples replication rows
+    (including the warp-speed critical value); ``binom_sd`` is the binomial reference only.
+    A bootstrap result is ``usable`` only with a non-empty pool and at most 5% failed draws
+    among replications whose own fit succeeded; otherwise its rates are NaN."""
     out = []
     for d in s.designs:
         df = load(root, d)
         if df.empty:
             continue
         ok = df[df.ok.astype(bool)]
-        base = {"design": d.name, "n": s.n, "reps_done": len(df), "reps_ok": len(ok)}
-        mc = np.sqrt(level * (1 - level) / max(len(ok), 1))
+        base = {
+            "design": d.name,
+            "n": s.n,
+            "reps_done": len(df),
+            "reps_target": s.reps,
+            "reps_ok": len(ok),
+            "binom_sd": float(np.sqrt(level * (1 - level) / max(len(ok), 1))),
+        }
+        ps, pi = ok.p_strict_asym.to_numpy(), ok.p_int_asym.to_numpy()
         out.append(
             base
             | {
                 "method": "asymptotic",
-                "block": None,
-                "strict_rej": float(np.mean(ok.p_strict_asym < level)),
-                "int_rej": float(np.mean(ok.p_int_asym < level)),
-                "mc_sd": mc,
-                "boot_fail_share": 0.0,
+                "block": np.nan,
+                "boot_fail_share": np.nan,
+                "usable": True,
+                "strict_rej": float(np.mean(ps[np.isfinite(ps)] < level)),
+                "strict_mc_sd": float(np.sqrt(level * (1 - level) / max(len(ok), 1))),
+                "int_rej": float(np.mean(pi[np.isfinite(pi)] < level)),
+                "int_mc_sd": float(np.sqrt(level * (1 - level) / max(len(ok), 1))),
             }
         )
         for b in s.blocks:
-            w, t = ok[f"wstar_b{b}"].to_numpy(), ok[f"tstar_b{b}"].to_numpy()
-            fail = float(np.mean(~np.isfinite(w) | ~np.isfinite(t)))
-            ps = warp_p(ok.wald0.to_numpy(), w, upper=True)
-            pi = warp_p(ok.t0.to_numpy(), t, upper=False)
+            w = pd.to_numeric(ok[f"wstar_b{b}"], errors="coerce").to_numpy(float)
+            t = pd.to_numeric(ok[f"tstar_b{b}"], errors="coerce").to_numpy(float)
+            fail = float(np.mean(~np.isfinite(w) | ~np.isfinite(t))) if len(ok) else np.nan
+            usable = bool(len(ok) and fail <= MAX_BOOT_FAIL)
+            rs, sds = warp_rejection(ok.wald0.to_numpy(), w, True, level, seed=b)
+            ri, sdi = warp_rejection(ok.t0.to_numpy(), t, False, level, seed=b + 1)
+            if not usable:
+                rs = sds = ri = sdi = np.nan
             out.append(
                 base
                 | {
                     "method": "iid bootstrap" if b == 1 else "block bootstrap",
                     "block": b,
-                    "strict_rej": float(np.mean(ps < level)),
-                    "int_rej": float(np.mean(pi < level)),
-                    "mc_sd": mc,
                     "boot_fail_share": fail,
+                    "usable": usable,
+                    "strict_rej": rs,
+                    "strict_mc_sd": sds,
+                    "int_rej": ri,
+                    "int_mc_sd": sdi,
                 }
             )
     return pd.DataFrame(out)

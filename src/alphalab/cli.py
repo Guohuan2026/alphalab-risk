@@ -169,8 +169,8 @@ def main(argv: list[str] | None = None) -> int:
             print(t.round(4).to_string(index=False))
             print(f"wrote {out}")
         elif args.summarize:
-            t = eb.summarize(root, s)
-            out = root.parent / "backtest_esr_bootstrap.csv"
+            t = eb.summarize(root, s, cells)
+            out = root.parent / f"backtest_{root.name}.csv"
             t.to_csv(out, index=False)
             with pd.option_context("display.width", 140, "display.float_format", "{:.4g}".format):
                 print(t.to_string(index=False))

@@ -477,11 +477,43 @@ def score_dependence(cell: Cell) -> dict:
 
 
 # ---------------------------------------------------------------- results
-def summarize(root: Path, s: BootstrapSettings) -> pd.DataFrame:
+def degenerate_start(y: np.ndarray, x: np.ndarray) -> bool:
+    """True if esreg's location-scale starting value has a non-positive fitted sd.
+
+    esreg (and our port) shift the |residual| regression by min(0.001, min fitted), which
+    sets the smallest fitted sd to (about) 0 whenever it is below 0.001; the likelihood is
+    then undefined at the start, both optimisers fail and the start is kept, so the
+    covariance divides by ~0 (Codex review round 4; found 2026-11-10). Such a draw has no
+    valid covariance and is counted as failed. The quantile and the ES forecast lie in the
+    span of the regressors, so this depends only on the OLS of y on x, i.e. on the resample.
+    """
+    b1 = np.linalg.lstsq(x, y, rcond=None)[0]
+    b2 = np.linalg.lstsq(x, np.abs(y - x @ b1), rcond=None)[0]
+    return bool(np.min(x @ b2) < 0.001)
+
+
+def _degenerate_draws(cell: Cell, idx: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Per resample: (strict draw degenerate, intercept draw degenerate)."""
+    ds, di = np.zeros(len(idx), bool), np.zeros(len(idx), bool)
+    for i, ix in enumerate(idx):
+        yb, eb = cell.y[ix], cell.ehat[ix]
+        x = np.column_stack([np.ones(len(ix)), eb])
+        ds[i] = degenerate_start(yb - yb.max(), x)
+        z = yb - eb
+        di[i] = degenerate_start(z - z.max(), x)
+    return ds, di
+
+
+def summarize(root: Path, s: BootstrapSettings, cells: list[Cell] | None = None) -> pd.DataFrame:
     """Bootstrap p-values per cell, from finished chunks. p-values only for complete cells
-    with at most 5% failed resamples (esback's rule)."""
+    with at most 5% failed resamples (esback's rule).
+
+    With ``cells`` (the same inputs the run used; checked by data hash), draws whose
+    resample hits esreg's degenerate location-scale start are counted as failed, and a cell
+    whose full sample hits it gets no p-value (Addition 9, amendment 7)."""
     rows = []
     bounds = chunk_bounds(s.reps, s.chunk)
+    by_key = {c.key: c for c in cells} if cells is not None else {}
     for d in sorted(p for p in root.iterdir() if p.is_dir()) if root.exists() else []:
         m = json.loads((d / "manifest.json").read_text())
         if (
@@ -490,7 +522,7 @@ def summarize(root: Path, s: BootstrapSettings) -> pd.DataFrame:
             or m.get("block") != s.block_for(m["n"])
         ):
             continue
-        files = sorted(d.glob("chunk_*.npz"))
+        files = sorted(d.glob("chunk_*.npz"), key=lambda f: int(f.stem.split("_")[1]))
         w = np.concatenate([np.load(f)["wald_star"] for f in files]) if files else np.array([])
         t = np.concatenate([np.load(f)["t_star"] for f in files]) if files else np.array([])
         complete = len(files) == len(bounds)
@@ -505,16 +537,39 @@ def summarize(root: Path, s: BootstrapSettings) -> pd.DataFrame:
             "wald0": m["wald0"],
             "t0": m["t0"],
         }
-        for name, x, observed, upper in (
+        cell = by_key.get(m["cell"])
+        full_bad = {"strict": False, "int": False}
+        if cell is not None:
+            if cell.data_sha256 != m["data_sha256"]:
+                raise RuntimeError(f"{d}: cell data differ from the run's (hash mismatch)")
+            js = [int(f.stem.split("_")[1]) for f in files]
+            n, blk = len(cell.y), m["block"]
+            idx = [
+                chunk_indices(cell.key, m["seed"], j, hi - lo, n, blk)
+                for j in js
+                for lo, hi in [bounds[j]]
+            ]
+            ds, di = _degenerate_draws(cell, np.vstack(idx)) if idx else (np.array([]),) * 2
+            w = np.where(ds, np.nan, w)
+            t = np.where(di, np.nan, t)
+            x = np.column_stack([np.ones(n), cell.ehat])
+            z = cell.y - cell.ehat
+            full_bad = {
+                "strict": degenerate_start(cell.y - cell.y.max(), x),
+                "int": degenerate_start(z - z.max(), x),
+            }
+            row["degenerate_share"] = float(np.mean(ds | di)) if len(ds) else np.nan
+        for name, xs, observed, upper in (
             ("strict", w, m["wald0"], True),
             ("int", t, m["t0"], False),
         ):
-            fail = float(np.mean(~np.isfinite(x))) if len(x) else np.nan
-            ok = x[np.isfinite(x)]
-            usable = complete and len(ok) > 0 and fail <= MAX_FAIL_SHARE
+            fail = float(np.mean(~np.isfinite(xs))) if len(xs) else np.nan
+            ok = xs[np.isfinite(xs)]
+            usable = complete and len(ok) > 0 and fail <= MAX_FAIL_SHARE and not full_bad[name]
             # strict: share of W* >= W0; intercept (one-sided, lower tail): share of t* <= t0
             p_boot = np.mean(ok >= observed) if upper else np.mean(ok <= observed)
             row[f"{name}_fail_share"] = fail
+            row[f"{name}_full_sample_degenerate"] = full_bad[name]
             row[f"{name}_p_boot"] = float(p_boot) if usable else np.nan
         rows.append(row)
     return pd.DataFrame(rows)
@@ -525,6 +580,7 @@ __all__ = [
     "Cell",
     "ESRFitError",
     "cells_from_config",
+    "degenerate_start",
     "chunk_bounds",
     "chunk_indices",
     "make_cell",

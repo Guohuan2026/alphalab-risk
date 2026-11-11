@@ -140,3 +140,27 @@ def test_sensitivity_runs_use_their_own_folder(tmp_path):
     main = tmp_path / "esr_bootstrap"
     assert eb.root_for(main, None) == main
     assert eb.root_for(main, 40) == tmp_path / "esr_bootstrap_block40"
+
+
+def test_degenerate_start_matches_the_port_and_fails_draws(tmp_path, cell):
+    """The flag is exactly 'the port's starting sd is not positive somewhere'."""
+    from alphalab.backtest.es import _cond_mean_sigma
+
+    rng = np.random.default_rng(5)
+    n = 300
+    x = np.column_stack([np.ones(n), rng.uniform(1, 2, n)])
+    y_ok = rng.normal(size=n) * x[:, 1]
+    assert not eb.degenerate_start(y_ok, x) and np.all(_cond_mean_sigma(y_ok, x)[1] > 0)
+    y_bad = rng.normal(size=n) * np.exp(6 * (x[:, 1] - 2))  # linear |resid| fit < 0 at x=1
+    assert eb.degenerate_start(y_bad, x)
+    with np.errstate(all="ignore"):
+        assert not np.all(_cond_mean_sigma(y_bad, x)[1] > 0)  # the defect being masked
+    s = eb.BootstrapSettings(reps=4, chunk=2, workers=1, nice=0)
+    eb.run(tmp_path, [cell], s)
+    plain = eb.summarize(tmp_path, s).iloc[0]
+    checked = eb.summarize(tmp_path, s, [cell]).iloc[0]
+    assert checked.degenerate_share == 0.0  # this cell never hits it ...
+    assert checked.strict_p_boot == plain.strict_p_boot  # ... so nothing changes
+    other = eb.make_cell(cell.key, *_series(seed=8), 0.05)
+    with pytest.raises(RuntimeError, match="hash"):
+        eb.summarize(tmp_path, s, [other])

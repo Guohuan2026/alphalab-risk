@@ -710,3 +710,14 @@ The autocorrelation is itself evidence of misspecification for the models where 
 
 The tie-band fix (Codex review round 3) changed the saved ESR statistics by at most 1.5e−4
 (relative); the logged tables were kept.
+
+---
+
+## 2026-11-10 (late) — ESR audit: P1 lasso QR ESR values are invalid
+
+Codex review round 4 and our own audit found an inherited esreg defect: for P1 lasso QR (all
+three levels) esreg's location-scale start puts a fitted sd at ~0, so the covariance, and
+hence those cells' ESR Wald, t and p-values in the entries above, are not valid. They are
+withdrawn (point estimates γ̂ are unaffected). This also explains most of the lasso-QR gap to
+esreg reported earlier. All other cells are unaffected in the full sample. No bootstrap
+p-value has been summarised yet (Addition 9, amendments 6–7 set the checks first).

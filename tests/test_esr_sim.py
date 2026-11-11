@@ -38,6 +38,8 @@ def test_warp_p_values():
     assert es_.warp_p(np.array([2.0]), star, upper=True)[0] == 0.5  # share >= 2
     assert es_.warp_p(np.array([1.0]), star, upper=False)[0] == 0.5  # share <= 1
     assert es_.warp_p(np.array([9.0]), np.append(star, np.nan), upper=True)[0] == 0.0
+    assert np.isnan(es_.warp_p(np.array([1.0]), np.array([np.nan]), upper=True)[0])  # empty pool
+    assert np.isnan(es_.warp_p(np.array([np.nan]), star, upper=True)[0])
     rng = np.random.default_rng(2)  # same law -> p uniform -> 5% rejections
     p = es_.warp_p(rng.chisquare(2, 4000), rng.chisquare(2, 4000), upper=True)
     assert np.mean(p < 0.05) == pytest.approx(0.05, abs=0.012)
@@ -57,3 +59,22 @@ def test_run_is_resumable_and_reproducible(tmp_path):
     assert set(t.method) == {"asymptotic", "iid bootstrap", "block bootstrap"}
     with pytest.raises(RuntimeError, match="other settings"):
         es_.run(tmp_path, es_.SimSettings(designs=s.designs, n=600, reps=6, batch=2, workers=1))
+
+
+def test_warp_rejection_sd_exceeds_binomial_and_failures_block_use(tmp_path):
+    rng = np.random.default_rng(3)
+    rate, sd = es_.warp_rejection(rng.chisquare(2, 1000), rng.chisquare(2, 1000), True, 0.05)
+    assert rate == pytest.approx(0.05, abs=0.02)
+    assert sd >= 0.8 * np.sqrt(0.05 * 0.95 / 1000)  # includes critical-value noise
+    assert all(np.isnan(es_.warp_rejection(np.array([1.0]), np.array([np.nan]), True, 0.05)))
+    s = es_.SimSettings(
+        designs=(es_.Design("A", 0.0),), n=600, reps=2, blocks=(1,), batch=2, workers=1, nice=0
+    )
+    es_.run(tmp_path, s)
+    f = tmp_path / "A" / "batch_0000.json"
+    rows = json.loads(f.read_text())
+    for r in rows:
+        r["wstar_b1"] = None  # every bootstrap draw failed
+    f.write_text(json.dumps(rows))
+    row = es_.summarize(tmp_path, s).query("method == 'iid bootstrap'").iloc[0]
+    assert not row.usable and np.isnan(row.strict_rej)

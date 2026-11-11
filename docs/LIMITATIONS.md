@@ -107,6 +107,12 @@ they can distort conclusions.
       weak dependence and stationarity; expanding-window forecasts are not strictly
       stationary, the block length is a rule of thumb, and its finite-sample size was not
       simulated (too costly). Results with another block length may differ.
+    - *Inherited esreg defect (degenerate start).* esreg's starting value for its
+      location-scale fit can set a fitted sd to ~0, after which the covariance is invalid.
+      It affects P1 lasso QR at every level (no ESR values) and some bootstrap resamples
+      (counted as failures); it is the likely cause of the lasso-QR disagreement with esreg
+      noted below. The bootstrap p-values also rest on a conditional first-order argument
+      (stationarity, mixing, moments) checked by simulation, not proved for this estimator.
     - *Covariance depends on a location-scale model.* esreg's variance estimator (ported here)
       models Y's conditional mean and scale as linear in the forecast. Where that fit is
       poor or has several optima (lasso QR, whose ES forecasts are heavily floored and tied),
