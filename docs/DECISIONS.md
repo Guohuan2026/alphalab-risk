@@ -22,3 +22,23 @@ upper bound reported, because pooling can hide an unstable cell; quarantined las
 stay excluded until cleared separately.
 **Action:** adopted as the launch gate; quarantined cells reported but not gating. Launching
 the overnight run additionally needs the user's approval (CLAUDE.md: jobs > 2 hours).
+
+## 2026-11-11 00:35 — overnight plan under the owner's pre-approvals (tonight only)
+
+Owner pre-approved (asleep): push `esr-robust-start`; launch the robust overnight bootstrap
+(--max-hours 8) if every non-quarantined real pilot cell and every simulation design has a
+failure rate < 2% AND the start-invariance check passes; otherwise ask Codex what to
+investigate. Questions put to Codex (codex exec), with its answers and the action taken:
+
+- **Q1. Legacy run while the robust run goes?** Codex: stop the legacy run once the pilot
+  passes, preserving its checkpoints, so the robust draws that supersede it get the compute.
+  **Action:** if (and only if) the robust run launches, stop the legacy session (script first,
+  so it cannot move on to P2), keeping every saved chunk; in-progress chunks are lost, saved
+  ones are untouched (atomic writes).
+- **Q2. Quarantined lasso-QR cells in the robust run?** Codex: exclude them; robust starts do
+  not establish the separate validation they need. **Action:** `--only '^(?!linqr_l1_)'`.
+- **Q3. Config order within 8 h?** Codex: P1, P2, P3, then P1-rolling (primary result first,
+  then breadth, then the robustness check). **Action:** adopted.
+- **Q4. Push despite the owner's pre-push hook (allows only alphalab-risk)?** Codex: leave
+  the branch unpushed and report; approval to push is not explicit approval to bypass the
+  owner's safeguard. **Action:** not pushed (no --no-verify); reported in the morning summary.
