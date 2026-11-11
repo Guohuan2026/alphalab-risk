@@ -25,3 +25,16 @@ Owner is learning: explain what each important command does and why, briefly.
 - Run tests + lint before calling a change done. Add/adjust tests with every code change.
 - Document new limitations in `docs/LIMITATIONS.md`; methodology in `docs/METHODOLOGY.md`.
 - Build incrementally, one milestone at a time (see `docs/ROADMAP.md`). Ask before large refactors.
+
+## Decisions: ask Codex before asking Guohuan
+When you reach a decision you would normally ask Guohuan about (choosing between options, approving a fix, launching a job):
+1. Send Codex a self-contained question via agent-hud (`mcp__agent-hud__send_message`) or `codex exec "<question + context + options>"`, asking for ONE recommendation and a reason.
+2. Follow Codex's recommendation, unless it falls under "Always ask Guohuan" below.
+3. Log every delegated decision in `docs/DECISIONS.md`: date, question, Codex's answer, what you did.
+
+### Always ask Guohuan (never delegate)
+- Deleting files or data, rewriting git history, force-pushing, or pushing to GitHub
+- Opening or touching the lockbox / held-out test data
+- Any job expected to run longer than 2 hours, or anything that costs money
+- Changing the pre-registered research design or hypotheses
+- When Codex's answer is unclear, contradicts the test results, or Codex doesn't reply within 30 minutes
