@@ -170,6 +170,12 @@ def cells_from_config(cfg, min_tail: int = 10) -> tuple[Path, list[Cell]]:
     return out / "esr_bootstrap", cells
 
 
+def root_for(root: Path, block: int | None) -> Path:
+    """Main run (default block) in ``esr_bootstrap``; any explicit block length in its own
+    folder, so sensitivity runs can never touch the main run's checkpoints."""
+    return root if block is None else root.with_name(f"{root.name}_block{block}")
+
+
 # ---------------------------------------------------------------- chunks and storage
 def chunk_bounds(reps: int, chunk: int) -> list[tuple[int, int]]:
     return [(s, min(s + chunk, reps)) for s in range(0, reps, chunk)]

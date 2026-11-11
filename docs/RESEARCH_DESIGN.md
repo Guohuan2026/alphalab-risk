@@ -546,3 +546,27 @@ Format: date · section · change · reason · made before/after seeing affected
      circular block bootstrap above, and the asymptotic p-values were reclassified as
      descriptive. A short check on two P1 cells (40 resamples each) agreed: block vs iid
      sd(t*) 0.71 vs 0.62 for FHS-GJR (long-run ratio 1.11) and 1.45 vs 0.60 for HS-500 (3.55).
+     **Amendment 6 (2026-11-10, 21:45 EST; written and committed before any bootstrap
+     p-value or simulation result existed): validation required before bootstrap p-values
+     are read as tests.**
+     (i) *Size simulation* (`alphalab esr-sim`, module `backtest/esr_sim.py`): stochastic
+     volatility (log σ AR(1), φ = 0.98, τ = 0.15) times an independent second component η
+     the forecaster misses, Student-t(5) shocks, α = 2.5%, T = 2,500, R = 1,000
+     replications, seed 20261111. The forecasts are the exact VaR/ES given σ (quadrature),
+     so the ESR null holds exactly. Designs: A, η ≡ 1 (correct forecasts, no score
+     autocorrelation); B1, log η AR(1) φ = 0.95, sd 0.8; B2, φ = 0.99, sd 0.7 (quantile-score
+     long-run ratio ≈ 1.8–1.9, real-data median 1.42, 90th percentile 2.66). Methods:
+     asymptotic, iid bootstrap and circular block bootstrap with blocks 10, 20 and 40, by
+     the warp-speed method (Giacomini, Politis & White 2013), all on the same replications.
+     (ii) *Acceptance rule:* the block bootstrap is accepted for a test (strict or
+     intercept) if, at block 20 (the closest to the 17–19 used), its 5% rejection rate is at
+     most 6.4% (5% + 2 Monte Carlo sd) in A, B1 and B2. If it fails in B2 only, the bootstrap
+     p-values are reported as valid for short-memory dependence only. If it fails in A or
+     B1, they are not read as tests.
+     (iii) *Block-length sensitivity on real data:* P1, α = 2.5%, all 11 models, B = 999,
+     blocks 10, 20 and 40 (same seed), in separate folders. A cell whose 5% decision
+     differs across the three blocks or the main run (block 19) is reported as
+     block-sensitive.
+     (iv) *Code audit* of null imposition (centring at γ̂, not at the null), parameter
+     re-estimation per resample, studentisation and resampling, plus an independent
+     review by Codex of the bootstrap and the esreg port.

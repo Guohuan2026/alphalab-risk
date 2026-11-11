@@ -134,3 +134,9 @@ def test_score_dependence_detects_autocorrelated_tail_errors(cell):
     db = eb.score_dependence(eb.make_cell("bad_0.025", loss, var, es, 0.025))
     assert db["lrv_ratio_quantile_score"] > 1.8 and db["lb10_p_quantile_score"] < 0.01
     assert db["lrv_ratio_es_score"] > 1.5
+
+
+def test_sensitivity_runs_use_their_own_folder(tmp_path):
+    main = tmp_path / "esr_bootstrap"
+    assert eb.root_for(main, None) == main
+    assert eb.root_for(main, 40) == tmp_path / "esr_bootstrap_block40"

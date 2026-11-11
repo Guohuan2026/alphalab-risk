@@ -44,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
             "esr-bootstrap",
             "resumable bootstrap calibration of the ESR tests (development; Addition 9)",
         ),
+        ("esr-sim", "Monte Carlo size of the ESR bootstrap tests under dependence (simulated)"),
     ]:
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("--config", required=True, help="path to YAML config")
@@ -64,7 +65,11 @@ def main(argv: list[str] | None = None) -> int:
                 "--block",
                 type=int,
                 default=None,
-                help="circular block length (default ceil(T^(1/3)); 1 = iid, not valid here)",
+                help="circular block length (default ceil(T^(1/3)); 1 = iid, not valid here); "
+                "a non-default length writes to its own folder esr_bootstrap_block<b>",
+            )
+            sp.add_argument(
+                "--only", default=None, help="regex on cell keys, e.g. '_0.025$' (sensitivity runs)"
             )
             mode = sp.add_mutually_exclusive_group()
             mode.add_argument("--plan", action="store_true", help="estimate only; no work")
@@ -72,6 +77,14 @@ def main(argv: list[str] | None = None) -> int:
             mode.add_argument(
                 "--diagnose", action="store_true", help="serial dependence of the ESR scores"
             )
+        if name == "esr-sim":
+            from alphalab.backtest.esr_sim import SimSettings as _SS
+
+            d = _SS()
+            sp.add_argument("--n", type=int, default=d.n, help="sample length")
+            sp.add_argument("--reps", type=int, default=d.reps, help="Monte Carlo replications")
+            sp.add_argument("--workers", type=int, default=d.workers, help="processes")
+            sp.add_argument("--summarize", action="store_true", help="write rejection rates")
         if name in ("forecast", "backtest"):
             sp.add_argument(
                 "--include-lockbox",
@@ -144,6 +157,11 @@ def main(argv: list[str] | None = None) -> int:
             block=args.block,
         )
         root, cells = eb.cells_from_config(cfg)
+        root = eb.root_for(root, args.block)
+        if args.only:
+            import re
+
+            cells = [c for c in cells if re.search(args.only, c.key)]
         if args.diagnose:
             t = pd.DataFrame([eb.score_dependence(c) for c in cells])
             out = root.parent / "backtest_esr_dependence.csv"
@@ -164,6 +182,20 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 json.dumps(eb.run(root, cells, s, Path("logs") / f"esr_bootstrap_{run_name}.log"))
             )
+    elif args.command == "esr-sim":
+        from pathlib import Path
+
+        from alphalab.backtest import esr_sim as es_
+
+        s = es_.SimSettings(n=args.n, reps=args.reps, workers=args.workers)
+        root = Path(cfg.data_dir) / "results" / "esr_sim" / f"n{s.n}_reps{s.reps}_seed{s.seed}"
+        if args.summarize:
+            t = es_.summarize(root, s)
+            t.to_csv(root / "rejection_rates.csv", index=False)
+            print(t.round(4).to_string(index=False))
+            print(f"wrote {root / 'rejection_rates.csv'}")
+        else:
+            print(es_.run(root, s, Path("logs") / f"esr_sim_{root.name}.log"))
     elif args.command == "snapshots":
         for s in RawSnapshotStore(cfg.data_dir).list(cfg.provider):
             print(s)
