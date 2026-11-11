@@ -38,3 +38,10 @@ When you reach a decision you would normally ask Guohuan about (choosing between
 - Any job expected to run longer than 2 hours, or anything that costs money
 - Changing the pre-registered research design or hypotheses
 - When Codex's answer is unclear, contradicts the test results, or Codex doesn't reply within 30 minutes
+
+## Autonomous run rules
+- Do NOT ask the user questions or wait for user input. The user is away.
+- For any decision you would normally ask the user about (design choices, ambiguous requirements, which model/method to use), send the question to the Codex session using Agent HUD's send_message, wait for its reply, and follow it.
+- If Codex does not reply within 10 minutes, make the most reasonable choice yourself, note it in DECISIONS.md, and continue.
+- At the start, run `date` and record the start time. Before each new step, run `date` again. Stop all work 2 hours after the start time.
+- When stopping, write a summary to RUN_SUMMARY.md: what was done, decisions Codex made, open issues.

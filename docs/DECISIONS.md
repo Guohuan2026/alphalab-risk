@@ -101,3 +101,16 @@ required; Wilson CIs; per-test failure counts; observed-rate sd; "unavailable" r
 as amendment 10(j) before any amended result was read; threshold 6.4% unchanged. Not
 adopted: per-test (instead of either-test) draw-failure gating; kept, as the more
 conservative existing rule (amendment 7(c)).
+
+## 2026-11-11 18:16 EST — autonomous run started (CLAUDE.md "Autonomous run rules")
+
+Start 18:16:02 EST; hard stop 20:16 EST; summary goes to RUN_SUMMARY.md.
+**Reconciling the two CLAUDE.md sections (my reading, no question needed):** "Autonomous run
+rules" replace *asking* the user, but not the "Always ask Guohuan" list. Items on that list
+(deleting data, rewriting history, pushing, the lockbox, jobs > 2 h or costing money, changing
+the pre-registered design) are neither done nor delegated during the run: they are left for
+the owner and listed in RUN_SUMMARY.md. Codex timeout is 10 min (new rule), after which I
+choose, log, and continue. Owner's standing limits from the amendment-10 approval also hold:
+no real-data bootstrap launch, no --no-verify, no estimator changes to obtain a pass.
+**Plan:** wait for the V2/V1 simulations (running since 18:08), apply the frozen gate
+(amendment 10(f), 10(j)), report GO/NO-GO; if GO, estimate the real-data cost only.
