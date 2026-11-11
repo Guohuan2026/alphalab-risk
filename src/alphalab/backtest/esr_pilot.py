@@ -261,6 +261,161 @@ def _wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     return max(0.0, c - h), min(1.0, c + h)
 
 
+# ---------------------------------------------------------------- start invariance
+TOL = 1e-6  # Codex decision 2026-11-11 (docs/DECISIONS.md): |dx| <= TOL * max(1, |x|), |dp| <= TOL
+
+
+def _both_modes(y, eh, alpha, b2) -> dict:
+    """W (vs H0), t, p-values with esreg's start and with the warm start, on one sample."""
+    from scipy import stats
+
+    x = np.column_stack([np.ones(len(y)), eh])
+    out = {}
+    for mode in ("esreg", "warm"):
+        ctx = contextlib.nullcontext() if mode == "esreg" else robust_scale(b2)
+        r = {"ok": False}
+        with ctx, np.errstate(all="ignore"):
+            try:
+                g, cov, _ = _strict_fit(y, x, alpha, 10)
+                d = g - np.array([0.0, 1.0])
+                w = float(d @ np.linalg.solve(cov, d))
+                g0, se, _, _ = _intercept_fit(y - eh, x, alpha, 10)
+                t = g0 / se
+                r = {
+                    "ok": bool(np.isfinite(w) and np.isfinite(t)),
+                    "w": w,
+                    "t": t,
+                    "p_w": float(stats.chi2.sf(w, 2)),
+                    "p_t": float(stats.norm.cdf(t)),
+                }
+            except (ESRFitError, np.linalg.LinAlgError):
+                pass
+        out[mode] = r
+    return out
+
+
+def _inv_real(args) -> list[dict]:
+    cfgname, key, n_draws = args
+    from alphalab.backtest.report import align
+    from alphalab.config import load_config
+    from alphalab.pipeline import _processed_dir, _results_dir
+    from alphalab.risk.engine import attach_outcomes
+
+    cfg = load_config(f"configs/{cfgname}.yaml")
+    proc = _processed_dir(cfg)
+    fc = pd.read_parquet(_results_dir(cfg, proc) / "forecasts.parquet")
+    m, a = key.rsplit("_", 1)
+    ev = align(
+        {
+            m: attach_outcomes(
+                fc[fc.model == m].drop(columns="model"),
+                pd.read_parquet(proc / "portfolio_daily.parquet")["ret"],
+            )
+        }
+    )[m]
+    L, E = ev["loss_next"].to_numpy(), ev[f"es_{a}"].to_numpy()
+    y, eh = eb._normalise(L, E)
+    n, alpha = len(y), float(a)
+    b2 = full_sample_b2(y, eh)
+    rows = [
+        {
+            "source": cfgname,
+            "cell": key,
+            "draw": "full",
+            "old_start_fails": _old_start_fails(y, eh),
+            **_flat(_both_modes(y, eh, alpha, b2)),
+        }
+    ]
+    idx = eb.chunk_indices(key, SEED, 0, DRAWS, n, int(np.ceil(n ** (1 / 3))))[:n_draws]
+    for i, ix in enumerate(idx):
+        rows.append(
+            {
+                "source": cfgname,
+                "cell": key,
+                "draw": i,
+                "old_start_fails": _old_start_fails(y[ix], eh[ix]),
+                **_flat(_both_modes(y[ix], eh[ix], alpha, b2)),
+            }
+        )
+    return rows
+
+
+def _inv_sim(args) -> list[dict]:
+    name, r0, r1 = args
+    s = es_.SimSettings()
+    d = next(x for x in s.designs if x.name == name)
+    rows = []
+    for r in range(r0, r1):
+        L, V, E = es_.simulate(d, s.n, np.random.default_rng(es_._rep_seed(s, d, r)), s.burn)
+        y, eh = eb._normalise(L, E)
+        b2 = full_sample_b2(y, eh)
+        ix = eb.chunk_indices(f"{d.name}_{r}", s.seed, 20, 1, s.n, 20)[0]
+        for lab, yy, ee in (("full", y, eh), ("block20", y[ix], eh[ix])):
+            rows.append(
+                {
+                    "source": f"sim {name}",
+                    "cell": f"rep{r}",
+                    "draw": lab,
+                    "old_start_fails": _old_start_fails(yy, ee),
+                    **_flat(_both_modes(yy, ee, d.alpha, b2)),
+                }
+            )
+    return rows
+
+
+def _flat(res: dict) -> dict:
+    return {f"{m}_{k}": v for m, r in res.items() for k, v in r.items()}
+
+
+def invariance(
+    out_dir: Path = Path("data/results/esr_pilot"),
+    workers: int = 4,
+    real_draws: int = 50,
+    sim_reps: int = 100,
+) -> pd.DataFrame:
+    jobs = [(_inv_real, (c, k, real_draws)) for c, ks in REAL.items() for k in ks]
+    jobs += [
+        (_inv_sim, (d.name, r, r + 25))
+        for d in es_.SimSettings().designs
+        for r in range(0, sim_reps, 25)
+    ]
+    with ProcessPoolExecutor(workers, initializer=_init) as ex:
+        futs = [ex.submit(f, a) for f, a in jobs]
+        df = pd.DataFrame([r for fu in futs for r in fu.result()])
+    df.to_csv(out_dir / "start_invariance.csv", index=False)
+    return df
+
+
+def invariance_report(df: pd.DataFrame) -> dict:
+    # esreg's start "succeeds" only if it is not degenerate: a degenerate start still returns a
+    # finite but meaningless statistic (Codex round 4), which must not count as success.
+    eok = df.esreg_ok.fillna(False).astype(bool)
+    wok = df.warm_ok.fillna(False).astype(bool)
+    old_bad = df.old_start_fails.astype(bool)
+    evalid = eok & ~old_bad
+    both = df[evalid & wok]
+    rel = lambda a, b: np.abs(a - b) / np.maximum(1.0, np.abs(a))  # noqa: E731
+    dw, dt = rel(both.esreg_w, both.warm_w), rel(both.esreg_t, both.warm_t)
+    dpw, dpt = np.abs(both.esreg_p_w - both.warm_p_w), np.abs(both.esreg_p_t - both.warm_p_t)
+    worst = both.assign(d=np.maximum(dw, dt)).sort_values("d").tail(3)
+    return {
+        "samples": len(df),
+        "both_succeeded": len(both),
+        "esreg_degenerate_finite_garbage": int((eok & old_bad).sum()),
+        "esreg_failed_warm_ok": int((~evalid & wok).sum()),
+        "warm_failed_esreg_ok": int((evalid & ~wok).sum()),
+        "max_rel_dW": float(dw.max()),
+        "max_rel_dt": float(dt.max()),
+        "max_abs_dp_strict": float(dpw.max()),
+        "max_abs_dp_int": float(dpt.max()),
+        "within_tolerance": bool(max(dw.max(), dt.max(), dpw.max(), dpt.max()) <= TOL),
+        "n_beyond_tol": int(((dw > TOL) | (dt > TOL) | (dpw > TOL) | (dpt > TOL)).sum()),
+        "worst": worst[
+            ["source", "cell", "draw", "esreg_w", "warm_w", "esreg_t", "warm_t"]
+        ].to_dict("records"),
+    }
+
+
 if __name__ == "__main__":
     _init()
     d = main()

@@ -53,3 +53,31 @@ def test_robust_mode_raises_instead_of_returning_invalid_scale():
         except ESRFitError:
             raised = True
     assert raised and trace[-1] == "failed"
+
+
+def test_invariance_report_ignores_degenerate_esreg_starts():
+    import pandas as pd
+
+    from alphalab.backtest.esr_pilot import invariance_report
+
+    df = pd.DataFrame(
+        {
+            "source": ["s"] * 3,
+            "cell": ["c"] * 3,
+            "draw": [0, 1, 2],
+            "old_start_fails": [False, True, False],
+            "esreg_ok": [True, True, True],
+            "warm_ok": [True, True, True],
+            "esreg_w": [2.0, 9.0, 1.0],
+            "warm_w": [2.0 + 1e-9, 3.0, 1.0],
+            "esreg_t": [0.5, 0.1, -1.0],
+            "warm_t": [0.5, 0.7, -1.0],
+            "esreg_p_w": [0.3, 0.01, 0.6],
+            "warm_p_w": [0.3, 0.2, 0.6],
+            "esreg_p_t": [0.7, 0.5, 0.2],
+            "warm_p_t": [0.7, 0.8, 0.2],
+        }
+    )
+    r = invariance_report(df)
+    assert r["both_succeeded"] == 2 and r["esreg_degenerate_finite_garbage"] == 1
+    assert r["within_tolerance"] and r["max_rel_dW"] < 1e-8
