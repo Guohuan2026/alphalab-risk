@@ -86,6 +86,11 @@ def main(argv: list[str] | None = None) -> int:
             mode.add_argument(
                 "--screen", action="store_true", help="degenerate-start check and quarantine"
             )
+            mode.add_argument(
+                "--audit-degenerate",
+                action="store_true",
+                help="count saved draws that used esreg's degenerate start (no refitting)",
+            )
         if name == "esr-sim":
             from alphalab.backtest.esr_sim import SimSettings as _SS
 
@@ -167,6 +172,19 @@ def main(argv: list[str] | None = None) -> int:
             robust_scale=not args.legacy_esreg_start,
             allow_legacy_start=args.legacy_esreg_start,
         )
+        if args.audit_degenerate:  # raw inputs only: no fitting, so it is quick
+            t = eb.audit_degenerate(
+                eb.root_for(eb.cells_root(cfg), args.block, robust=s.robust_scale),
+                eb.series_from_config(cfg),
+            )
+            out = (
+                eb.cells_root(cfg).parent
+                / f"esr_degenerate_audit_{'robust' if s.robust_scale else 'legacy'}.csv"
+            )
+            t.to_csv(out, index=False)
+            print(t.to_string(index=False))
+            print(f"wrote {out}")
+            return 0
         root, cells = eb.cells_from_config(cfg, robust=s.robust_scale)
         root = eb.root_for(root, args.block, robust=s.robust_scale)
         if args.only:

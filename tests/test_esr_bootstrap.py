@@ -247,3 +247,30 @@ def test_legacy_resume_needs_explicit_flag(tmp_path):
         reps=2, chunk=1, workers=1, nice=0, robust_scale=False, allow_legacy_start=True
     )
     assert eb.run(tmp_path, [plain], s)["chunks_done"] == 2
+
+
+def test_audit_counts_silent_degenerate_draws(tmp_path):
+    legacy = eb.BootstrapSettings(
+        reps=6, chunk=3, workers=1, nice=0, robust_scale=False, allow_legacy_start=True, block=5
+    )
+    clean = _series()
+    rng = np.random.default_rng(12)
+    n = 800
+    es = 0.02 * rng.uniform(1, 2, n)  # scale convex in the forecast: esreg start degenerate
+    loss = rng.standard_t(5, n) * 0.004 * np.exp(6 * (es / 0.02 - 2)) + 0.002
+    bad = (loss, 0.7 * es, es)
+    series = {"clean_0.05": (*clean, 0.05), "bad_0.05": (*bad, 0.05)}
+    cells = [eb.make_cell(k, *v[:3], v[3]) for k, v in series.items()]
+    assert all(c is not None for c in cells)
+    with np.errstate(all="ignore"):
+        eb.run(tmp_path, cells, legacy)
+    t = eb.audit_degenerate(tmp_path, series).set_index("cell")
+    assert (t.draws_saved == 6).all()
+    assert t.loc["clean_0.05", "degenerate_either"] == 0
+    assert t.loc["bad_0.05", "full_sample_degenerate"]
+    assert t.loc["bad_0.05", "degenerate_either"] > 0
+    # the defect: degenerate draws were saved as finite numbers, i.e. silently "valid"
+    assert t.loc["bad_0.05", "silent_strict"] + t.loc["bad_0.05", "silent_int"] > 0
+    series["clean_0.05"] = (*_series(seed=9), 0.05)
+    with pytest.raises(RuntimeError, match="hash"):
+        eb.audit_degenerate(tmp_path, series)

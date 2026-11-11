@@ -197,6 +197,44 @@ def make_cell(
     )
 
 
+def cells_root(cfg) -> Path:
+    """The main bootstrap folder of a risk config (development results run)."""
+    from alphalab.pipeline import _processed_dir, _results_dir
+
+    return _results_dir(cfg, _processed_dir(cfg)) / "esr_bootstrap"
+
+
+def series_from_config(cfg) -> dict:
+    """Cell key -> (loss, var, es, alpha) from the development forecasts, exactly as
+    :func:`cells_from_config` builds them (same data hash), without fitting anything."""
+    from alphalab.backtest.report import align
+    from alphalab.pipeline import _processed_dir, _results_dir
+    from alphalab.risk.engine import attach_outcomes
+
+    proc = _processed_dir(cfg)
+    fc = pd.read_parquet(_results_dir(cfg, proc) / "forecasts.parquet")  # never *_lockbox
+    ret = pd.read_parquet(proc / "portfolio_daily.parquet")["ret"]
+    evs = align(
+        {
+            m: attach_outcomes(f.drop(columns="model"), ret)
+            for m, f in fc.groupby("model", sort=False)
+        }
+    )
+    lock = pd.Timestamp(cfg.risk.lockbox_start)
+    out = {}
+    for name, ev in evs.items():
+        if (ev["target_date"] >= lock).any():
+            raise RuntimeError(f"{name}: development forecasts reach the lockbox ({lock.date()})")
+        for a in cfg.risk.alphas:
+            out[f"{name}_{a:g}"] = (
+                ev["loss_next"].to_numpy(float),
+                ev[f"var_{a:g}"].to_numpy(float),
+                ev[f"es_{a:g}"].to_numpy(float),
+                a,
+            )
+    return out
+
+
 def cells_from_config(cfg, min_tail: int = 10, robust: bool = False) -> tuple[Path, list[Cell]]:
     """Development-sample cells for every model and alpha of a risk config."""
     from alphalab.backtest.report import align
@@ -616,6 +654,65 @@ def _degenerate_draws(cell: Cell, idx: np.ndarray) -> tuple[np.ndarray, np.ndarr
     return ds, di
 
 
+def _series_hash(loss, var, es, alpha) -> str:
+    h = hashlib.sha256()
+    for arr in (np.asarray(loss, float), np.asarray(var, float), np.asarray(es, float)):
+        h.update(np.ascontiguousarray(arr).tobytes())
+    h.update(repr(float(alpha)).encode())
+    return h.hexdigest()
+
+
+def audit_degenerate(root: Path, series: dict) -> pd.DataFrame:
+    """Saved draws whose fit used esreg's degenerate location-scale start (the pilot's
+    detection, :func:`degenerate_start`), per cell; no refitting. ``series`` maps cell key ->
+    (loss, var, es, alpha), checked against the manifest's data hash. A degenerate draw with
+    a finite saved statistic is a *silent* failure: it would have counted as valid."""
+    rows = []
+    for d in sorted(p for p in Path(root).iterdir() if p.is_dir()):
+        m = json.loads((d / "manifest.json").read_text())
+        files = sorted(d.glob("chunk_*.npz"), key=lambda f: int(f.stem.split("_")[1]))
+        if m["cell"] not in series:
+            raise KeyError(f"no input series for {m['cell']}")
+        loss, var, es, alpha = series[m["cell"]]
+        if _series_hash(loss, var, es, alpha) != m["data_sha256"]:
+            raise RuntimeError(f"{d}: input data differ from the run's (hash mismatch)")
+        y, eh = _normalise(loss, es)
+        n = len(y)
+        x = np.column_stack([np.ones(n), eh])
+        z = y - eh
+        bounds = chunk_bounds(m["reps"], m["chunk"])
+        ds_all, di_all, w_all, t_all = [], [], [], []
+        for f in files:
+            j = int(f.stem.split("_")[1])
+            lo, hi = bounds[j]
+            idx = chunk_indices(m["cell"], m["seed"], j, hi - lo, n, m["block"])
+            cell = Cell(m["cell"], alpha, y, eh, (0.0, 0.0), 0.0, 0.0, 0.0, "")
+            ds, di = _degenerate_draws(cell, idx)
+            z_ = np.load(f)
+            ds_all.append(ds)
+            di_all.append(di)
+            w_all.append(z_["wald_star"])
+            t_all.append(z_["t_star"])
+        cat = (lambda v: np.concatenate(v)) if files else (lambda v: np.array([], float))
+        ds, di, w, t = cat(ds_all).astype(bool), cat(di_all).astype(bool), cat(w_all), cat(t_all)
+        rows.append(
+            {
+                "cell": m["cell"],
+                "estimator_version": m["estimator_version"],
+                "draws_saved": len(w),
+                "full_sample_degenerate": degenerate_start(y - y.max(), x)
+                or degenerate_start(z - z.max(), x),
+                "degenerate_strict": int(ds.sum()),
+                "degenerate_int": int(di.sum()),
+                "degenerate_either": int((ds | di).sum()),
+                "silent_strict": int((ds & np.isfinite(w)).sum()),
+                "silent_int": int((di & np.isfinite(t)).sum()),
+                "share_either": float((ds | di).mean()) if len(w) else float("nan"),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 # Models whose ESR results are unavailable until a corrected, validated estimator exists.
 QUARANTINE = {
     "linqr_l1": (
@@ -739,6 +836,7 @@ __all__ = [
     "Cell",
     "ESRFitError",
     "cells_from_config",
+    "audit_degenerate",
     "degenerate_start",
     "full_sample_b2",
     "screen",
