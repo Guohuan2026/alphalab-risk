@@ -60,3 +60,20 @@ as failures, examine sensitivity; with an unbounded likelihood a higher likeliho
 identify the better fit, so multi-start alone cannot resolve it.
 **Action:** threshold 0.05 = the interior criterion already pre-specified in amendment 8(d)(2)
 (no new number chosen after seeing results); sensitivity at 0.01 and 0.10.
+
+## 2026-11-11 07:30 — end-solution audit result; estimator choice escalated to the owner
+
+**Audit** (`esr_endaudit`, threshold 0.05 = amendment 8(d)(2); output
+`data/results/esr_pilot/end_solution_by_group.csv`): legacy P1 draws, 22 non-lasso cells,
+0 of 21,879 flagged (min ratio ≥ 0.22); lasso flags all coincide with degenerate starts.
+Robust real-data pilot, 0 of 1,400 flagged. Simulations (robust start): A 2–3%, B1 22–24%,
+B2 31–32% flagged. The boundary is an estimator limitation of the linear-sd scale model,
+growing under the misspecification the test should detect; the pre-specified size
+simulation cannot be evaluated with these failure rates.
+**Question to Codex:** keep scl_sp and report failures / switch to 'ind' covariance /
+log-linear scale / unstudentised bootstrap? **Codex:** switch the bootstrap studentisation to
+esreg's 'ind' covariance by a frozen amendment (post-lockbox, exploratory), keep the ≤ 6.4%
+criterion, re-run A/B1/B2, and report the scl_sp results as motivation.
+**Action:** NOT implemented. This changes the pre-registered estimator, which CLAUDE.md
+reserves for the owner ("Changing the pre-registered research design"). Escalated in the
+morning summary. No overnight run launched.
