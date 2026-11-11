@@ -473,21 +473,40 @@ Format: date · section · change · reason · made before/after seeing affected
      ill-conditioned sandwich → NaN with the reason in `strict_status` / `int_status`; the
      other test is still computed. Never a pseudo-inverse. A status "ok (ind variance
      fallback)" marks esreg's fall-back from "scl_sp".
-   - *Bootstrap calibration (specified here before any bootstrap value exists):* esback's
-     studentised iid pairs bootstrap, B = 999, seed 20261110: each resample refits both
-     versions; W* = (γ* − γ̂)ᵀ Cov*⁻¹ (γ* − γ̂) and t* = (γ0* − γ̂0)/se*; p_boot = share of
-     W* ≥ W (strict) and of t* ≤ t (intercept, one-sided). More than 5% failed resamples →
-     no bootstrap p-value (esback's rule). Implemented as a resumable job
-     (`alphalab esr-bootstrap`); reported next to the asymptotic p-values when run.
+   - *Bootstrap calibration (specified before any bootstrap value exists; scheme changed
+     in amendment 5, also before any value):* studentised **circular block bootstrap**
+     (Politis & Romano 1992) of the days (Y_t, ê_t), block length ⌈T^{1/3}⌉ (19 for P1,
+     17 for P2 and P3), B = 999, seed 20261110. Each resample refits both versions;
+     W* = (γ* − γ̂)ᵀ Cov*⁻¹ (γ* − γ̂) and t* = (γ0* − γ̂0)/se*, with the same esreg covariance
+     as the asymptotic test; p_boot = share of W* ≥ W (strict) and of t* ≤ t (intercept,
+     one-sided). More than 5% failed resamples, or an incomplete cell, → no bootstrap
+     p-value (esback's rule). Why blocks: see the dependence diagnostic below. Validity: the
+     statistics are studentised by an iid covariance, which is inconsistent under serial
+     correlation, but the block bootstrap reproduces the limiting distribution of exactly
+     that statistic (a scaled χ²(2) / normal) under weak dependence with block → ∞,
+     block/T → 0, so no HAC estimate is needed; circular blocks make every day equally
+     likely, so centring at γ̂ is correct. This is a first-order argument; the bootstrap's
+     size was not checked by simulation (each p-value costs 999 refits) and the block
+     length is a rule of thumb (no sensitivity run is planned before the main run).
+     Implemented as a resumable job (`alphalab esr-bootstrap`).
+   - *Serial-dependence diagnostic (`alphalab esr-bootstrap --diagnose`,
+     `backtest_esr_dependence.csv`):* on the fitted intercept-ESR scores, Ljung–Box (10
+     lags) and the Newey–West long-run / iid variance ratio (⌈T^{1/3}⌉ lags). Real
+     development data, 132 cells: Ljung–Box rejects at 1% for 81% (quantile score) and 98%
+     (ES score) of cells; ES-score ratio median 1.94 (10–90%: 1.14–3.69, max 4.2), lowest
+     for FHS-GJR and GJR-t (1.11), highest for HS-500 (3.55). The ES-score diagnostic is
+     noisy under heavy tails (a few days dominate its variance); the bounded quantile score
+     is the more reliable signal.
    - *Scope:* every model, α ∈ the configured levels, development samples only (as DQ and Z2;
      the lockbox has been opened). Not run on lockbox tables.
    - *Reading rule:* supplementary absolute ES test next to McNeil–Frey and Z2. It feeds no
      hypothesis (H1–H4) and changes no headline ranking (FZ0 + MCS remain the criteria). The
-     one-sided intercept test is the ESR result (unchanged since amendment 2); it is
-     conservative in simulation, so a non-rejection is weak evidence. Strict ESR stays
-     secondary. Its earlier caveat ("over-sized, not read as 5% tests", amendments 2–3) is
-     withdrawn in amendment 4, because that over-size was an implementation error; with the
-     esreg covariance its simulated size is 2.5–7.3%.
+     one-sided intercept test is the ESR result (unchanged since amendment 2). Strict ESR
+     stays secondary. The asymptotic p-values assume serially uncorrelated scores, which
+     the diagnostic rejects for most cells (amendment 5); they are therefore descriptive
+     and too small where the long-run ratio exceeds 1. Only complete block-bootstrap
+     p-values are read as tests. (Amendments 2–3's "strict over-sized" caveat was an
+     implementation error, withdrawn in amendment 4.)
    - *Validation of the final version:* (i) against esreg on 33 P1 series and 9 simulated
      series, with esreg's ML step run to convergence: Wald and t agree to a median 0.5% /
      0.4%, 90% of series within 3% (exceptions: lasso QR, whose location-scale likelihood has
@@ -517,3 +536,13 @@ Format: date · section · change · reason · made before/after seeing affected
      9–10.5% at T = 5,000, where esreg has 2.7–8.7%); the covariance was replaced by the
      esreg port above. The trigger was the reference check, not the real-data results; the
      reading rule was kept, and the superseded real-data values remain in RESULTS_LOG.
+     **Amendment 5 (2026-11-10, after Codex review round 3 and before any bootstrap value):**
+     (a) a single tie band now defines tail membership everywhere (n_tail, the "ind"
+     variance, the empirical CDF), and inputs that overflow the normalisation are rejected;
+     recomputed against the saved development tables, Wald and t moved by at most 1.5e−4
+     (relative), p-values by at most 1.1e−3, n_tail by about one observation, γ̂ not at
+     all, so the saved tables were kept; (b) the serial-dependence diagnostic above showed autocorrelated ESR scores in most
+     cells, so the pre-specified iid pairs bootstrap would be invalid; it was replaced by the
+     circular block bootstrap above, and the asymptotic p-values were reclassified as
+     descriptive. A short check on two P1 cells (40 resamples each) agreed: block vs iid
+     sd(t*) 0.71 vs 0.62 for FHS-GJR (long-run ratio 1.11) and 1.45 vs 0.60 for HS-500 (3.55).

@@ -437,11 +437,18 @@ implementation: the authors' R packages esreg 0.6.3 and esback 0.3.1.
 - *Unavailable results* (too few tail observations, constant forecast, failed fit,
   ill-conditioned sandwich) are NaN with a reason in `strict_status` / `int_status`; the
   other test still runs.
-- *Bootstrap.* `alphalab esr-bootstrap` computes esback's studentised pairs-bootstrap
-  p-values (B = 999) as a resumable job: deterministic per-chunk seeds, atomic chunk files,
-  a manifest that refuses mixed inputs, a worker cap, low priority, a wall-clock budget, a
-  lock file and a progress log. `--plan` estimates the run time; `--summarize` writes
-  `backtest_esr_bootstrap.csv`.
+- *Serial dependence.* `alphalab esr-bootstrap --diagnose` tests the fitted intercept-ESR
+  scores for autocorrelation (Ljung–Box, 10 lags; Newey–West long-run / iid variance ratio).
+  Both the asymptotic covariance and an iid bootstrap assume none; on our data most cells
+  have it, so the asymptotic p-values are descriptive.
+- *Bootstrap.* `alphalab esr-bootstrap` computes studentised **circular block** bootstrap
+  p-values (B = 999, block ⌈T^{1/3}⌉; `--block 1` gives esback's iid pairs bootstrap, which
+  is not valid here). Studentising by the iid covariance is fine: the block bootstrap
+  reproduces the distribution of that statistic, autocorrelation included. The job is
+  resumable: deterministic per-chunk seeds, atomic chunk files, a manifest that refuses
+  mixed inputs (including another block length), a worker cap, low priority, a wall-clock
+  budget, a lock file and a progress log. `--plan` estimates the run time; `--summarize`
+  writes `backtest_esr_bootstrap.csv`.
 
 Why the covariance matters (2026-11-10): an earlier version used the empirical outer
 product of the scores as the meat. It is consistent, but with heavy tails it was badly

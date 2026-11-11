@@ -1,9 +1,17 @@
 """Resumable bootstrap calibration of the ESR backtests (RESEARCH_DESIGN Addition 9).
 
 Why: the asymptotic ESR p-values are approximations; Bayer & Dimitriadis (and esback)
-calibrate them with a studentised iid pairs bootstrap. Each resample refits the joint
-(quantile, ES) regression, so a full run (all models x levels x portfolios, B = 999) takes
-hours. This module makes that an overnight job that can be stopped and resumed at any time.
+calibrate them with a studentised iid pairs bootstrap. On our series the ESR scores are
+serially correlated (Ljung-Box rejects in 98% of cells; long-run / iid variance 1.1-4.2),
+so iid resampling would understate the variance just as the asymptotic covariance does.
+We therefore resample circular blocks of consecutive days (Politis & Romano 1992), block
+length ceil(T^(1/3)) by default, keeping the studentisation by the iid (esreg) covariance:
+the bootstrap then reproduces the distribution of that statistic, autocorrelation
+included, without needing a HAC estimate (first-order validity under weak dependence,
+block -> infinity, block/T -> 0). ``block=1`` gives esback's iid scheme. Each resample
+refits the joint (quantile, ES) regression, so a full run (all models x levels x
+portfolios, B = 999) takes hours. This module makes that an overnight job that can be
+stopped and resumed at any time.
 
 Design
 - One *cell* = (portfolio run, model, alpha). Its B resamples are split into chunks.
@@ -54,7 +62,7 @@ from alphalab.backtest.es import (
 log = logging.getLogger(__name__)
 
 # Bump when the estimator or covariance changes: chunks made by another version are refused.
-ESTIMATOR_VERSION = "esr-2026-11-10-esreg-vcovA-port"
+ESTIMATOR_VERSION = "esr-2026-11-10-esreg-vcovA-port-tieband-cbb"
 MAX_FAIL_SHARE = 0.05  # esback: more than 5% failed resamples -> no bootstrap p-value
 
 
@@ -67,6 +75,13 @@ class BootstrapSettings:
     nice: int = 10
     max_hours: float | None = None
     min_tail: int = 10
+    block: int | None = None  # circular block length; None -> ceil(T^(1/3)); 1 -> iid
+
+    def block_for(self, n: int) -> int:
+        b = self.block if self.block is not None else int(np.ceil(n ** (1 / 3)))
+        if not 1 <= b <= n:
+            raise ValueError(f"block length {b} outside [1, {n}]")
+        return b
 
 
 @dataclass(frozen=True)
@@ -160,10 +175,22 @@ def chunk_bounds(reps: int, chunk: int) -> list[tuple[int, int]]:
     return [(s, min(s + chunk, reps)) for s in range(0, reps, chunk)]
 
 
-def chunk_indices(cell_key: str, seed: int, j: int, size: int, n: int) -> np.ndarray:
-    """Resample positions for chunk j of a cell: depends only on (seed, cell, j)."""
+def chunk_indices(
+    cell_key: str, seed: int, j: int, size: int, n: int, block: int = 1
+) -> np.ndarray:
+    """Resample positions for chunk j of a cell: depends only on (seed, cell, j, block).
+
+    Circular block bootstrap: ceil(n / block) blocks of ``block`` consecutive days with
+    uniform start points, wrapping around the end, truncated to n. Every day is equally
+    likely to be drawn, so the bootstrap world's true parameter is the full-sample estimate
+    (the centring the studentised statistics use). block = 1 is the iid pairs bootstrap.
+    """
     ss = np.random.SeedSequence([seed, zlib.crc32(cell_key.encode()), j])
-    return np.random.default_rng(ss).integers(0, n, size=(size, n))
+    rng = np.random.default_rng(ss)
+    k = -(-n // block)
+    starts = rng.integers(0, n, size=(size, k))
+    idx = (starts[:, :, None] + np.arange(block)[None, None, :]) % n
+    return idx.reshape(size, k * block)[:, :n]
 
 
 def _manifest(cell: Cell, s: BootstrapSettings) -> dict:
@@ -177,6 +204,8 @@ def _manifest(cell: Cell, s: BootstrapSettings) -> dict:
         "reps": s.reps,
         "chunk": s.chunk,
         "min_tail": s.min_tail,
+        "scheme": "circular block" if s.block_for(len(cell.y)) > 1 else "iid pairs",
+        "block": s.block_for(len(cell.y)),
         "g_hat": list(cell.g_hat),
         "g0_hat": cell.g0_hat,
         "wald0": cell.wald0,
@@ -198,7 +227,16 @@ def prepare_cell_dir(root: Path, cell: Cell, s: BootstrapSettings) -> Path:
     mpath = d / "manifest.json"
     if mpath.exists():
         old = json.loads(mpath.read_text())
-        keys = ("estimator_version", "data_sha256", "seed", "reps", "chunk", "min_tail", "n")
+        keys = (
+            "estimator_version",
+            "data_sha256",
+            "seed",
+            "reps",
+            "chunk",
+            "min_tail",
+            "n",
+            "block",
+        )
         diff = [k for k in keys if old.get(k) != m[k]]
         if diff:
             raise RuntimeError(
@@ -218,7 +256,7 @@ def _run_chunk(args) -> tuple[str, int, float]:
     """Worker: compute and save one chunk. Returns (cell key, chunk id, seconds)."""
     d, cell, s, j, lo, hi = args
     t = time.perf_counter()
-    idx = chunk_indices(cell.key, s.seed, j, hi - lo, len(cell.y))
+    idx = chunk_indices(cell.key, s.seed, j, hi - lo, len(cell.y), s.block_for(len(cell.y)))
     w, tt = esr_bootstrap_draws(
         cell.y, cell.ehat, cell.alpha, idx, cell.g_hat, cell.g0_hat, s.min_tail
     )
@@ -259,7 +297,8 @@ class _Lock:
 
 def time_one_resample(cell: Cell, s: BootstrapSettings, k: int = 2) -> float:
     """Seconds per resample (both versions), measured on k resamples of this cell."""
-    idx = chunk_indices(cell.key, s.seed + 1, 0, k, len(cell.y))  # not a real chunk
+    n = len(cell.y)
+    idx = chunk_indices(cell.key, s.seed + 1, 0, k, n, s.block_for(n))  # not a real chunk
     t = time.perf_counter()
     esr_bootstrap_draws(cell.y, cell.ehat, cell.alpha, idx, cell.g_hat, cell.g0_hat, s.min_tail)
     return (time.perf_counter() - t) / k
@@ -378,6 +417,59 @@ def run(root: Path, cells: list[Cell], s: BootstrapSettings, log_path: Path | No
             handler.close()
 
 
+# ---------------------------------------------------------------- dependence diagnostic
+def _ljung_box_p(x: np.ndarray, lags: int = 10) -> float:
+    from scipy import stats
+
+    x = x - x.mean()
+    n, d = len(x), float(x @ x)
+    if d == 0:
+        return float("nan")
+    r = np.array([x[k:] @ x[:-k] / d for k in range(1, lags + 1)])
+    q = n * (n + 2) * np.sum(r**2 / (n - np.arange(1, lags + 1)))
+    return float(stats.chi2.sf(q, lags))
+
+
+def _long_run_ratio(x: np.ndarray, lags: int) -> float:
+    """Newey-West (Bartlett) long-run variance / variance: 1 without autocorrelation."""
+    x = x - x.mean()
+    g0 = float(x @ x) / len(x)
+    lr = g0 + sum(
+        2 * (1 - k / (lags + 1)) * float(x[k:] @ x[:-k]) / len(x) for k in range(1, lags + 1)
+    )
+    return lr / g0 if g0 > 0 else float("nan")
+
+
+def score_dependence(cell: Cell) -> dict:
+    """Serial dependence of the fitted one-sided-intercept ESR scores (normalised units).
+
+    Both the asymptotic covariance and an iid bootstrap assume the scores are serially
+    uncorrelated. Reports Ljung-Box p-values (10 lags) for the quantile score 1[Z <= q] - a
+    and the ES-intercept score (e - S)/e^2, and their Newey-West long-run / iid variance
+    ratios with ceil(T^(1/3)) lags (> 1: iid standard errors too small)."""
+    from alphalab.backtest.es import _at_or_below, _fit_joint
+
+    z = cell.y - cell.ehat
+    n = len(z)
+    zs = z - float(z.max())
+    x = np.column_stack([np.ones(n), cell.ehat])
+    beta, g = _fit_joint(zs, x, np.ones((n, 1)), cell.alpha, np.array([zs.min() - z.std() - 1e-12]))
+    q = x @ beta
+    hit = _at_or_below(zs - q, float(np.abs(zs).max())).astype(float)
+    s_es = (g[0] - (q + (zs - q) * hit / cell.alpha)) / g[0] ** 2
+    s_q = hit - cell.alpha
+    lags = int(np.ceil(n ** (1 / 3)))
+    return {
+        "cell": cell.key,
+        "alpha": cell.alpha,
+        "n": n,
+        "lb10_p_quantile_score": _ljung_box_p(s_q),
+        "lb10_p_es_score": _ljung_box_p(s_es),
+        "lrv_ratio_quantile_score": _long_run_ratio(s_q, lags),
+        "lrv_ratio_es_score": _long_run_ratio(s_es, lags),
+    }
+
+
 # ---------------------------------------------------------------- results
 def summarize(root: Path, s: BootstrapSettings) -> pd.DataFrame:
     """Bootstrap p-values per cell, from finished chunks. p-values only for complete cells
@@ -386,7 +478,11 @@ def summarize(root: Path, s: BootstrapSettings) -> pd.DataFrame:
     bounds = chunk_bounds(s.reps, s.chunk)
     for d in sorted(p for p in root.iterdir() if p.is_dir()) if root.exists() else []:
         m = json.loads((d / "manifest.json").read_text())
-        if m["estimator_version"] != ESTIMATOR_VERSION or m["reps"] != s.reps:
+        if (
+            m["estimator_version"] != ESTIMATOR_VERSION
+            or m["reps"] != s.reps
+            or m.get("block") != s.block_for(m["n"])
+        ):
             continue
         files = sorted(d.glob("chunk_*.npz"))
         w = np.concatenate([np.load(f)["wald_star"] for f in files]) if files else np.array([])
@@ -398,6 +494,8 @@ def summarize(root: Path, s: BootstrapSettings) -> pd.DataFrame:
             "reps_done": len(w),
             "reps_target": m["reps"],
             "complete": complete,
+            "scheme": m.get("scheme"),
+            "block": m.get("block"),
             "wald0": m["wald0"],
             "t0": m["t0"],
         }

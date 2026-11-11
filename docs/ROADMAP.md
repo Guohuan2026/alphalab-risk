@@ -42,8 +42,8 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
     descriptive, √10-scaled 1-day forecasts (2026-11-08, Clarification 8; development only;
     `alphalab horizon`). ✅ Bayer–Dimitriadis ESR backtest (2026-11-10, Addition 9;
     exploratory, development only; `backtest_esr.csv`; covariance ported from and checked
-    against the authors' esreg). Bootstrap calibration job ready (`alphalab esr-bootstrap`),
-    full run (~13 CPU-hours) not yet done.
+    against the authors' esreg). Circular block bootstrap job (`alphalab esr-bootstrap`),
+    chosen after a serial-dependence diagnostic; full run (~13 hours, 4 workers) started 2026-11-10.
 12. ✅ Lockbox opened once (2026-11-07; protocol pushed first): the development headline was
     NOT replicated in the calm 2023–26 period (docs/RESULTS_LOG.md).
 13. ✅ Streamlit dashboard (`make dashboard`; reads saved results; no model fitting in the app).

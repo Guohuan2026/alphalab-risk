@@ -342,8 +342,9 @@ with tabs[2]:
                 st.caption(
                     "ESR (exploratory, development only): intercept p < 0.05 = ES understated "
                     "after conditioning on the forecast (the ESR result; conservative). Strict "
-                    "ESR (secondary) also tests the slope on the forecast. Both p-values are "
-                    "asymptotic (LIMITATIONS #17)."
+                    "ESR (secondary) also tests the slope on the forecast. These p-values are "
+                    "asymptotic and ignore serial correlation in the scores, which is present "
+                    "in most cells, so they are descriptive and too small (LIMITATIONS #17)."
                 )
         if dm is not None:
             st.subheader("Diebold–Mariano on FZ0 (row vs column; negative = row better)")

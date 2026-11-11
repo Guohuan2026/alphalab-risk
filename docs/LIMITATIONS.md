@@ -92,13 +92,21 @@ they can distort conclusions.
 17. **ESR backtest: added late; asymptotic p-values; one fragile series (Addition 9).** The
     ESR test was not pre-registered; it was added on 2026-11-10, after the lockbox was
     opened, so it is exploratory and run on development samples only.
-    - *Size:* with correct forecasts in two simulated designs the strict test rejected
-      2.5–7.3% of the time at the 5% level and the one-sided intercept test 0–3%. The
-      intercept test is conservative, so not rejecting is weak evidence that ES is adequate.
-      These sizes come from two data-generating processes and may differ for real returns.
-      Bootstrap p-values (esback's studentised pairs bootstrap) are implemented but not yet
-      computed (about 13 CPU-hours with 4 workers); the iid bootstrap ignores any serial
-      dependence left in the ESR scores.
+    - *Serial dependence invalidates the asymptotic p-values.* The ESR covariance (esreg's,
+      like the paper's) assumes serially uncorrelated scores. On our series they are
+      autocorrelated in most cells (Ljung–Box rejects at 1% in 81–98% of 132 cells;
+      long-run / iid variance of the ES score median 1.9, up to 4.2; smallest for FHS-GJR
+      and GJR-t, 1.1). The asymptotic p-values are therefore too small, by an amount that
+      differs by model, and are treated as descriptive. The autocorrelation itself is a
+      sign of misspecification, so models with it are unlikely to be well calibrated anyway.
+    - *Size in simulation:* with correct forecasts (scores then have no autocorrelation)
+      the strict test rejected 2.5–7.3% at 5% and the one-sided intercept test 0–3%
+      (conservative: not rejecting is weak evidence). Two data-generating processes only.
+    - *Block bootstrap, first-order only.* The calibrated p-values use a circular block
+      bootstrap (block ⌈T^{1/3}⌉ = 17–19 days). Its validity rests on asymptotic theory under
+      weak dependence and stationarity; expanding-window forecasts are not strictly
+      stationary, the block length is a rule of thumb, and its finite-sample size was not
+      simulated (too costly). Results with another block length may differ.
     - *Covariance depends on a location-scale model.* esreg's variance estimator (ported here)
       models Y's conditional mean and scale as linear in the forecast. Where that fit is
       poor or has several optima (lasso QR, whose ES forecasts are heavily floored and tied),

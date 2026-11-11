@@ -688,3 +688,25 @@ models and the simple baselines understate ES nearly everywhere. With correctly 
 the previous entry's tentative observation weakens: the slopes below 1 for the GARCH family
 remain significant at 5% in most cells, but for FHS-GJR only in 3 of 12. No headline
 conclusion changes. Bootstrap p-values (Addition 9) have not been computed yet.
+
+---
+
+## 2026-11-10 — ESR scores are serially correlated: asymptotic p-values are descriptive
+
+Before launching the bootstrap, the fitted one-sided-intercept ESR scores were tested for
+autocorrelation (`alphalab esr-bootstrap --diagnose`, `backtest_esr_dependence.csv`, 132
+development cells). Ljung–Box (10 lags) rejects at 1% in 81% of cells for the quantile
+score and 98% for the ES score. Newey–West long-run / iid variance ratio of the ES score,
+median by model: FHS-GJR 1.11, GJR-t 1.11, GARCH-t 1.42, HAR-FHS 1.52, EWMA 1.69, lasso QR
+2.05, GB quantile 2.65, RF-vol FHS 2.73, HS-250 3.07, QRF 3.23, HS-500 3.55.
+
+**Consequence for the previous entry:** its p-values assume no autocorrelation, so they are
+too small. Roughly, the intercept t should be divided by √ratio: about ×0.95 for the GARCH
+family (little change) but ×0.5–0.6 for HS-500, QRF and HS-250. The rejection counts are
+upper bounds; the direction of each γ̂0 is unaffected. These p-values are now descriptive.
+Calibrated p-values will come from the circular block bootstrap (Addition 9, amendment 5),
+which replaced the iid bootstrap specified earlier today, before any bootstrap value existed.
+The autocorrelation is itself evidence of misspecification for the models where it is large.
+
+The tie-band fix (Codex review round 3) changed the saved ESR statistics by at most 1.5e−4
+(relative); the logged tables were kept.

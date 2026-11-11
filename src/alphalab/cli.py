@@ -60,9 +60,18 @@ def main(argv: list[str] | None = None) -> int:
             sp.add_argument("--workers", type=int, default=d.workers, help="processes")
             sp.add_argument("--nice", type=int, default=d.nice, help="CPU priority increment")
             sp.add_argument("--max-hours", type=float, default=None, help="wall-clock budget")
+            sp.add_argument(
+                "--block",
+                type=int,
+                default=None,
+                help="circular block length (default ceil(T^(1/3)); 1 = iid, not valid here)",
+            )
             mode = sp.add_mutually_exclusive_group()
             mode.add_argument("--plan", action="store_true", help="estimate only; no work")
             mode.add_argument("--summarize", action="store_true", help="write p-values")
+            mode.add_argument(
+                "--diagnose", action="store_true", help="serial dependence of the ESR scores"
+            )
         if name in ("forecast", "backtest"):
             sp.add_argument(
                 "--include-lockbox",
@@ -132,9 +141,16 @@ def main(argv: list[str] | None = None) -> int:
             workers=args.workers,
             nice=args.nice,
             max_hours=args.max_hours,
+            block=args.block,
         )
         root, cells = eb.cells_from_config(cfg)
-        if args.summarize:
+        if args.diagnose:
+            t = pd.DataFrame([eb.score_dependence(c) for c in cells])
+            out = root.parent / "backtest_esr_dependence.csv"
+            t.to_csv(out, index=False)
+            print(t.round(4).to_string(index=False))
+            print(f"wrote {out}")
+        elif args.summarize:
             t = eb.summarize(root, s)
             out = root.parent / "backtest_esr_bootstrap.csv"
             t.to_csv(out, index=False)
