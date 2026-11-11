@@ -269,6 +269,24 @@ def warp_rejection(
 MAX_BOOT_FAIL = 0.05  # same rule as the real-data bootstrap
 
 
+def _wilson_str(rate: float, n: int, z: float = 1.96) -> str:
+    """Wilson 95% interval for a rejection rate from n replications ('' if unavailable)."""
+    if not (n and np.isfinite(rate)):
+        return ""
+    k = rate * n
+    c = (k + z * z / 2) / (n + z * z)
+    h = z * np.sqrt(k * (n - k) / n + z * z / 4) / (n + z * z)
+    return f"[{max(0.0, c - h):.3f}, {min(1.0, c + h):.3f}]"
+
+
+def _rate_cols(name: str, rej: np.ndarray, finite: np.ndarray) -> dict:
+    """Asymptotic rejection rate with the binomial sd at the OBSERVED rate and Wilson CI."""
+    n = int(finite.sum())
+    r = float(np.mean(rej[finite])) if n else float("nan")
+    sd = float(np.sqrt(r * (1 - r) / n)) if n else float("nan")
+    return {f"{name}_rej": r, f"{name}_mc_sd": sd, f"{name}_wilson95": _wilson_str(r, n)}
+
+
 def load(root: Path, d: Design) -> pd.DataFrame:
     rows = []
     for p in sorted((Path(root) / d.name).glob("batch_*.json")):
@@ -319,6 +337,11 @@ def summarize(root: Path, s: SimSettings, level: float = 0.05) -> pd.DataFrame:
         else:  # amendment 10: no scale fit (V2) or failures raised inside the fit (V1)
             full_bad = pd.Series(False, index=df.index)
         ok = df[df.ok.astype(bool)]
+        # amendment 10(j): availability over ALL target replications, so a "pass" cannot come
+        # from a selected subset of successful fits or from an unfinished run
+        full_fail = s.reps - len(ok)
+        complete = len(df) == s.reps
+        avail_ok = complete and full_fail <= MAX_BOOT_FAIL * s.reps
         base = {
             "degenerate_full_reps": int(full_bad.sum()),
             "design": d.name,
@@ -326,9 +349,15 @@ def summarize(root: Path, s: SimSettings, level: float = 0.05) -> pd.DataFrame:
             "reps_done": len(df),
             "reps_target": s.reps,
             "reps_ok": len(ok),
+            "full_fail": int(full_fail),
+            "complete": bool(complete),
             "binom_sd": float(np.sqrt(level * (1 - level) / max(len(ok), 1))),
         }
-        ps, pi = ok.p_strict_asym.to_numpy(), ok.p_int_asym.to_numpy()
+        if ok.empty:  # nothing fitted: report unavailable rather than fail
+            out.append(base | {"method": "unavailable", "usable": False})
+            continue
+        ps = pd.to_numeric(ok.p_strict_asym, errors="coerce").to_numpy(float)
+        pi = pd.to_numeric(ok.p_int_asym, errors="coerce").to_numpy(float)
         out.append(
             base
             | {
@@ -336,17 +365,15 @@ def summarize(root: Path, s: SimSettings, level: float = 0.05) -> pd.DataFrame:
                 "block": np.nan,
                 "boot_fail_share": np.nan,
                 "usable": True,
-                "strict_rej": float(np.mean(ps[np.isfinite(ps)] < level)),
-                "strict_mc_sd": float(np.sqrt(level * (1 - level) / max(len(ok), 1))),
-                "int_rej": float(np.mean(pi[np.isfinite(pi)] < level)),
-                "int_mc_sd": float(np.sqrt(level * (1 - level) / max(len(ok), 1))),
+                **_rate_cols("strict", ps < level, np.isfinite(ps)),
+                **_rate_cols("int", pi < level, np.isfinite(pi)),
             }
         )
         for b in s.blocks:
             w = pd.to_numeric(ok[f"wstar_b{b}"], errors="coerce").to_numpy(float)
             t = pd.to_numeric(ok[f"tstar_b{b}"], errors="coerce").to_numpy(float)
             fail = float(np.mean(~np.isfinite(w) | ~np.isfinite(t))) if len(ok) else np.nan
-            usable = bool(len(ok) and fail <= MAX_BOOT_FAIL)
+            usable = bool(avail_ok and len(ok) and fail <= MAX_BOOT_FAIL)
             rs, sds = warp_rejection(ok.wald0.to_numpy(), w, True, level, seed=b)
             ri, sdi = warp_rejection(ok.t0.to_numpy(), t, False, level, seed=b + 1)
             if not usable:
@@ -357,11 +384,15 @@ def summarize(root: Path, s: SimSettings, level: float = 0.05) -> pd.DataFrame:
                     "method": "iid bootstrap" if b == 1 else "block bootstrap",
                     "block": b,
                     "boot_fail_share": fail,
+                    "draw_fail_strict": int(np.sum(~np.isfinite(w))),
+                    "draw_fail_int": int(np.sum(~np.isfinite(t))),
                     "usable": usable,
                     "strict_rej": rs,
                     "strict_mc_sd": sds,
+                    "strict_wilson95": _wilson_str(rs, len(ok)),
                     "int_rej": ri,
                     "int_mc_sd": sdi,
+                    "int_wilson95": _wilson_str(ri, len(ok)),
                 }
             )
     return pd.DataFrame(out)

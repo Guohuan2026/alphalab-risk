@@ -89,3 +89,53 @@ def test_warp_rejection_sd_exceeds_binomial_and_failures_block_use(tmp_path):
     f.write_text(json.dumps(rows))
     row = es_.summarize(tmp_path, s).query("method == 'iid bootstrap'").iloc[0]
     assert not row.usable and np.isnan(row.strict_rej)
+
+
+def test_summarize_requires_complete_run_and_full_sample_availability(tmp_path, monkeypatch):
+    """Amendment 10(j): survivors-only rates are never 'usable'."""
+    import json
+
+    import numpy as np
+
+    from alphalab.backtest import esr_sim as sim
+
+    s = sim.SimSettings(
+        cov="ind_nomis", reps=20, blocks=(20,), designs=(sim.SimSettings().designs[0],)
+    )
+    d = s.designs[0]
+    (tmp_path / d.name).mkdir()
+    rng = np.random.default_rng(0)
+
+    def rows(n_fail):
+        out = []
+        for r in range(s.reps):
+            if r < n_fail:
+                out.append({"rep": r, "ok": False})
+            else:
+                out.append(
+                    {
+                        "rep": r,
+                        "ok": True,
+                        "wald0": float(rng.chisquare(2)),
+                        "t0": float(rng.normal()),
+                        "p_strict_asym": 0.5,
+                        "p_int_asym": 0.5,
+                        "wstar_b20": float(rng.chisquare(2)),
+                        "tstar_b20": float(rng.normal()),
+                    }
+                )
+        return out
+
+    path = tmp_path / d.name / "batch_0000.json"
+    path.write_text(json.dumps(rows(0)))
+    t = sim.summarize(tmp_path, s).set_index("method")
+    assert bool(t.loc["block bootstrap", "usable"]) and t.loc["block bootstrap", "strict_wilson95"]
+    path.write_text(json.dumps(rows(3)))  # 15% failed full-sample fits: survivors only
+    t = sim.summarize(tmp_path, s).set_index("method")
+    assert (
+        not bool(t.loc["block bootstrap", "usable"]) and t.loc["block bootstrap", "full_fail"] == 3
+    )
+    path.write_text(json.dumps(rows(0)[:10]))  # unfinished run
+    assert not bool(sim.summarize(tmp_path, s).set_index("method").loc["block bootstrap", "usable"])
+    path.write_text(json.dumps(rows(20)))  # everything failed: unavailable, no crash
+    assert sim.summarize(tmp_path, s).method.tolist() == ["unavailable"]

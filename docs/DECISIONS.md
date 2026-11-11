@@ -89,3 +89,15 @@ report V1 as a secondary sensitivity with its failure rule; distinguish the ESR 
 null from correct specification (V2 imposes cdf = α; adequacy to be shown by simulation);
 check against R esback/esreg; apply the gate to V2, never pick whichever variant passes.
 **Action:** adopted; frozen in RESEARCH_DESIGN amendment 10 before any amended simulation ran.
+
+## 2026-11-11 18:10 — Codex review of amendment 10 implementation
+
+**Codex:** algebra OK (cdf = α ≡ misspec = FALSE, all Λ/Σ blocks match esreg), default path
+unchanged, pairing preserved, assumptions honestly stated. MAJOR: the summary could pass on
+survivors only (full-sample failures excluded, incomplete run accepted). MINORs: failure
+counts/Wilson intervals missing; asymptotic sd at nominal 5%; crash if all fits fail.
+**Action:** all adopted in `esr_sim.summarize` (completeness + ≤ 5% full-sample failures
+required; Wilson CIs; per-test failure counts; observed-rate sd; "unavailable" row), recorded
+as amendment 10(j) before any amended result was read; threshold 6.4% unchanged. Not
+adopted: per-test (instead of either-test) draw-failure gating; kept, as the more
+conservative existing rule (amendment 7(c)).

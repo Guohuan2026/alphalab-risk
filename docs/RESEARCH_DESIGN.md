@@ -705,3 +705,14 @@ Format: date · section · change · reason · made before/after seeing affected
      fit ends on the boundary, as specified.
      (i) *Real data:* only after a GO, and only with the owner's approval of the cost; new
      estimator version, separate folders; no earlier checkpoint is overwritten.
+     (j) *Addendum (2026-11-11 18:10 EST, from Codex's review of the implementation; added while
+     the V2 simulation was running and before any amended result was read; the 6.4%
+     threshold is unchanged):* a method is usable only if the run is complete (all 1,000
+     replications), at most 5% of replications fail their full-sample fit, AND at most 5% of
+     the surviving replications' draws fail; otherwise it counts as failing (f). This closes
+     a gap where rates computed on the surviving replications alone could pass under heavy
+     attrition. Rejection rates are reported with Wilson 95% intervals and explicit
+     full-sample and per-test draw-failure counts; asymptotic sds use the observed rate.
+     Applied identically to every variant, so the earlier scl_sp result read with this rule
+     is also unusable in design A (69 of 1,000 full samples degenerate); its saved file is
+     kept as written.
