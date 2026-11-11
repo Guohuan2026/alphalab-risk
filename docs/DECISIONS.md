@@ -42,3 +42,21 @@ investigate. Questions put to Codex (codex exec), with its answers and the actio
 - **Q4. Push despite the owner's pre-push hook (allows only alphalab-risk)?** Codex: leave
   the branch unpushed and report; approval to push is not explicit approval to bypass the
   owner's safeguard. **Action:** not pushed (no --no-verify); reported in the morning summary.
+
+## 2026-11-11 06:45 — robust-start gate failed; next step (Codex)
+
+**Gate result (owner's pre-approved rule):** pilot PASS (2,600 draws, 0 failures, Wilson upper
+bound 1.9% per group); start-invariance FAIL (real data 297/297 within 1e-6, sim A within
+3e-9, but sims B1/B2 24 of 285 samples beyond tolerance, e.g. Wald 3.14 vs 10.08). **Action:
+overnight robust run NOT launched.** (The legacy session had already ended at its 04:47
+budget, so Q1 of 00:35 did not arise.) Diagnosis: in 22 of 24 divergent samples esreg's end
+solution has min fitted sd ≈ 0 (the linear-sd Gaussian likelihood is unbounded as an sd → 0);
+the warm start usually, not always, finds an interior optimum.
+**Question to Codex:** what next? (a) end-solution validity check + re-audit; (b) constrained
+or log-linear scale model; (c) multi-start, keep highest likelihood; (d) use 'ind' variance.
+**Codex:** (a): add an end-solution check (min/median fitted sd below a predefined threshold
+→ failed draw) for both starts, re-audit legacy, real and pilot draws, report flagged draws
+as failures, examine sensitivity; with an unbounded likelihood a higher likelihood cannot
+identify the better fit, so multi-start alone cannot resolve it.
+**Action:** threshold 0.05 = the interior criterion already pre-specified in amendment 8(d)(2)
+(no new number chosen after seeing results); sensitivity at 0.01 and 0.10.
