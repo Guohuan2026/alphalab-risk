@@ -596,6 +596,10 @@ near the bottom.
 
 ## 2026-11-10 — Bayer–Dimitriadis ESR backtest (exploratory, development samples only)
 
+> **Superseded (same day) by the next entry.** The p-values below used a covariance
+> estimator that over-rejected (found by a cross-check against the authors' R package); the
+> point estimates (γ̂0, γ̂1) are unchanged. Kept for the record.
+
 Specification committed first (Addition 9, `2a8ed66`), amended after one simulation and two
 external code-review rounds and a cross-platform tie fix (found by CI), all before the
 numbers below; they come from the final code (the commit that adds this entry). Not pre-registered
@@ -639,3 +643,48 @@ realised tail losses move less than one-for-one with the ES forecast (ES too hig
 high-forecast days relative to low-forecast days). FHS-GJR's strict p-values are far
 below what the measured over-size alone would produce, but the test is not calibrated, so
 this is noted, not claimed. No headline conclusion changes.
+
+---
+
+## 2026-11-10 — ESR backtest, corrected covariance (supersedes the previous entry's p-values)
+
+Why: the R reference implementation (esreg 0.6.3 / esback 0.3.1) was installed and run on the
+same series. Point estimates agreed (|Δγ1| ≤ 0.0025); the covariance did not. Our empirical
+outer-product meat made the strict test reject a correct model 21% of the time at T = 1,000
+(9–10.5% at T = 5,000), whereas esreg's model-based meat has 2.7–8.7%. The covariance is now a
+port of esreg's `vcovA` (Addition 9, amendment 4), which matches esreg to a median 0.5% once
+esreg's own location-scale optimisation is run to convergence. Simulated size of the final
+code: strict 2.5–7.3%, intercept 0–3%; power against ES 20% too small 97–100%. This
+correction was made after the previous entry's values were logged; the trigger was the
+reference check, not those values. Re-running the development backtests again left all 36
+other tables byte-identical. All 132 fits succeeded; 5 used esreg's "ind" variance fallback.
+
+**P1 one-sided intercept ESR: γ̂0 in % (p-value), 1 / 2.5 / 5%** (γ̂0 < 0 = ES understated):
+
+| Model | 1% | 2.5% | 5% |
+|---|---|---|---|
+| FHS-GJR | +0.190 (0.68) | +0.094 (0.79) | +0.042 (0.72) |
+| HAR-FHS | −0.096 (0.43) | −0.104 (0.23) | −0.110 (0.053) |
+| GJR-t | −0.130 (0.37) | −0.135 (0.10) | −0.139 (0.022) |
+| GARCH-t | −0.132 (0.37) | −0.142 (0.13) | −0.164 (0.008) |
+| RF-vol FHS | −0.443 (0.12) | −0.283 (0.051) | −0.190 (0.015) |
+| HS-500 | −0.570 (0.023) | −0.345 (0.042) | −0.195 (0.035) |
+| lasso QR | −0.464 (0.023) | −0.365 (0.017) | −0.327 (0.008) |
+| HS-250 | −0.764 (0.001) | −0.418 (0.025) | −0.235 (0.009) |
+| EWMA, QRF, GB quantile | all < 0, p ≤ 0.009 | | |
+
+**P1 strict ESR, slope γ̂1 (p-value), 1 / 2.5 / 5%:** FHS-GJR 0.65 (0.31) / 0.73 (0.065) /
+0.79 (0.025); HAR-FHS 0.74 (0.12) / 0.84 (0.049) / 0.91 (0.036); GARCH-t and GJR-t 0.72–0.85
+(p ≤ 0.015); RF-vol FHS 1.03–1.11 (0.011–0.085); every other model p ≤ 0.032.
+
+**Rejections at 5% (of 12 cells: P1, P2, P3, P1 rolling × 3 levels), intercept / strict:**
+FHS-GJR 0 / 3; HAR-FHS 0 / 5; GARCH-t, GJR-t and RF-vol FHS 6 / 11; HS-500 7 / 12; lasso QR
+9 / 9; HS-250 11 / 12; EWMA, GB quantile and QRF 12 / 12. (Previous, superseded entry:
+FHS-GJR 0 / 8, HAR-FHS 2 / 9, GJR-t 9 / 11, GARCH-t 10 / 12.)
+
+**Reading:** the intercept-test ordering is unchanged and agrees with Z2 and McNeil–Frey:
+FHS-GJR (γ̂0 > 0 everywhere on P1) and HAR-FHS are never rejected; the direct-quantile ML
+models and the simple baselines understate ES nearly everywhere. With correctly sized p-values,
+the previous entry's tentative observation weakens: the slopes below 1 for the GARCH family
+remain significant at 5% in most cells, but for FHS-GJR only in 3 of 12. No headline
+conclusion changes. Bootstrap p-values (Addition 9) have not been computed yet.

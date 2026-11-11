@@ -427,27 +427,38 @@ Format: date · section · change · reason · made before/after seeing affected
    - *Reading rule:* descriptive robustness only; it feeds no hypothesis (H1–H4).
 
 9. **2026-11-10 · §7 · Addition (not pre-registered): Bayer–Dimitriadis ESR backtest.**
-   Written and committed before any ESR value was computed on real or simulated data
-   (commit `2a8ed66`); amended twice the same day, both times before any real-data ESR value
-   (see the end of this entry). §7 has no conditional ES test: McNeil–Frey and Z2 check ES on
-   average, not whether ES errors are predictable from the forecast itself. The ESR test
-   (Bayer & Dimitriadis 2020, *J. Financial Econometrics* 20(3)) fills that gap. Because it is
-   added after `prereg-v1` and after the lockbox was opened, it is exploratory and changes
-   nothing that was pre-registered.
+   First written and committed before any ESR value was computed (commit `2a8ed66`). Amended
+   several times the same day; amendments 1–3 came before any real-data ESR value, amendment
+   4 after the first real-data values had been logged (history at the end of this entry).
+   §7 has no conditional ES test: McNeil–Frey and Z2 check ES on average, not whether ES
+   errors are predictable from the forecast itself. The ESR test (Bayer & Dimitriadis 2020,
+   *J. Financial Econometrics* 20(3)) fills that gap. Because it is added after `prereg-v1`
+   and after the lockbox was opened, it is exploratory and changes nothing that was
+   pre-registered.
+   - *Reference implementation:* the authors' R packages esreg 0.6.3 (`esreg`, `vcovA`) and
+     esback 0.3.1 (`esr_backtest`). The Python code follows them; deviations are listed below.
    - *Convention:* returns Y_t = −L_{t+1}, ES forecast in return units ê_t = −ES_t (made at
-     origin t).
+     origin t). Inputs are divided by sd(L) first (unit-free; intercepts scaled back).
    - *Estimator:* the joint (quantile, ES) M-estimator minimising mean FZ0 loss (esreg
-     defaults G1 = 0, G2(z) = −1/z), by block coordinate descent: weighted linear quantile
-     regression with weights 1/(−e_t) given e (exact LP), then the ES coefficients given q
-     (iterated weighted least squares on S_t = q_t + (Y_t − q_t)·1[Y_t ≤ q_t]/α, weights
-     1/e_t², with step halving that keeps all e_t < 0 and never raises the loss), until the
-     joint loss stops falling. As in esreg, Y is shifted by c = max(max_t Y_t, 0) while
-     fitting and the intercepts are shifted back.
-   - *Covariance:* the full misspecification-robust sandwich Λ⁻¹CΛ⁻ᵀ/T for (β, γ)
-     (Dimitriadis & Bayer 2019; esreg `vcovA` with misspecification terms), including the
-     cross blocks with (1[Y ≤ q] − α) and the (e − S)/e³ term in the ES block; the conditional
-     density at q_t by Hendricks–Koenker difference quotients with the Hall–Sheather
-     bandwidth. The ES block is used.
+     `g1 = 2, g2 = 1`: G1 = 0, G2(z) = −1/z), computed exactly by block coordinate descent:
+     weighted linear quantile regression with weights 1/(−e_t) given e (LP), then the ES
+     coefficients given q (iterated weighted least squares on S_t = q_t + (Y_t −
+     q_t)·1[Y_t ≤ q_t]/α, weights 1/e_t², step halving keeping all e_t < 0), until the joint
+     loss stops falling. Y is shifted by max(Y) while fitting, as in esreg. (esreg itself uses
+     Nelder–Mead with random restarts; the estimates agree to |Δγ1| ≤ 0.0025.)
+   - *Covariance:* esreg `vcovA(sparsity = "nid", sigma_est = "scl_sp", misspec = TRUE)`,
+     ported formula by formula: Hendricks–Koenker density with the Hall–Sheather bandwidth;
+     conditional CDF at q_t from a Gaussian location-scale fit of Y on the quantile
+     regressors; conditional truncated variance ("scl_sp") from the same location-scale model
+     and a Sheather–Jones kernel density (R's `bw.SJ`, reproduced to 12 digits); esreg's
+     misspecification terms in Λ and Σ; esreg's fall-backs ("ind" variance when "scl_sp"
+     fails; "iid" density and "ind" variance when both equations have one regressor).
+     Deviations from esreg, all numerical: (a) the location-scale ML fit is iterated to
+     convergence with an analytic gradient (esreg's single BFGS run stops early, by 2 to
+     ~9,500 log-likelihood units on our series); (b) the kernel density is evaluated exactly
+     at R's 512 grid points instead of by FFT binning; (c) observations the LP fit
+     interpolates are counted as "at or below q" in the empirical CDF regardless of the last
+     floating-point bits.
    - *Strict ESR (two-sided):* quantile and ES regressors (1, ê_t). H0: (γ0, γ1) = (0, 1);
      Wald statistic, χ²(2) p-value.
    - *One-sided intercept ESR:* Z_t = Y_t − ê_t; quantile regressors (1, ê_t), ES regressor 1.
@@ -456,42 +467,49 @@ Format: date · section · change · reason · made before/after seeing affected
    - *Unavailable results:* fewer than 10 observations at or below the fitted quantile, a
      (nearly) constant ES forecast (strict only: slope not identified), a failed fit or an
      ill-conditioned sandwich → NaN with the reason in `strict_status` / `int_status`; the
-     other test is still computed. Never a pseudo-inverse.
+     other test is still computed. Never a pseudo-inverse. A status "ok (ind variance
+     fallback)" marks esreg's fall-back from "scl_sp".
+   - *Bootstrap calibration (specified here before any bootstrap value exists):* esback's
+     studentised iid pairs bootstrap, B = 999, seed 20261110: each resample refits both
+     versions; W* = (γ* − γ̂)ᵀ Cov*⁻¹ (γ* − γ̂) and t* = (γ0* − γ̂0)/se*; p_boot = share of
+     W* ≥ W (strict) and of t* ≤ t (intercept, one-sided). More than 5% failed resamples →
+     no bootstrap p-value (esback's rule). Implemented as a resumable job
+     (`alphalab esr-bootstrap`); reported next to the asymptotic p-values when run.
    - *Scope:* every model, α ∈ the configured levels, development samples only (as DQ and Z2;
      the lockbox has been opened). Not run on lockbox tables.
    - *Reading rule:* supplementary absolute ES test next to McNeil–Frey and Z2. It feeds no
      hypothesis (H1–H4) and changes no headline ranking (FZ0 + MCS remain the criteria). The
-     one-sided intercept test is the ESR result; it is conservative in our simulations, so a
-     non-rejection is weak evidence. Strict-ESR p-values are shown but labelled over-sized and
-     are not read as 5% tests.
-   - *Amendment 1 (after the first simulation):* the location shift was added when a
-     positive fitted intercept made some fitted e_t > 0.
-   - *Amendment 2 (after code review round 1, 2026-11-10):* the first version fitted the
-     quantile unweighted and once (a two-step estimator, not the joint FZ0 one) and used
-     only the correctly-specified ES block of the covariance; replaced by the estimator and
-     sandwich above. Its simulated size (strict 10.7%, intercept 4.0% at T = 5,000) is
-     superseded.
-   - *Simulation check of the final version (before any real-data value):* correct VaR/ES,
-     rejection rate at 5% (200–300 replications per cell, Monte Carlo sd ≤ 0.025):
+     one-sided intercept test is the ESR result (unchanged since amendment 2); it is
+     conservative in simulation, so a non-rejection is weak evidence. Strict ESR stays
+     secondary. Its earlier caveat ("over-sized, not read as 5% tests", amendments 2–3) is
+     withdrawn in amendment 4, because that over-size was an implementation error; with the
+     esreg covariance its simulated size is 2.5–7.3%.
+   - *Validation of the final version:* (i) against esreg on 33 P1 series and 9 simulated
+     series, with esreg's ML step run to convergence: Wald and t agree to a median 0.5% /
+     0.4%, 90% of series within 3% (exceptions: lasso QR, whose location-scale likelihood has
+     several optima so the two implementations use different ones, and one Wald ≈ 88 where R
+     reports p = 0); (ii) three of those comparisons are fixed regression tests (5%
+     tolerance); (iii) size at 5% with correct forecasts, 200–300 replications per cell
+     (Monte Carlo sd ≤ 0.017):
 
      | DGP | T | strict ESR | intercept ESR |
      |---|---|---|---|
-     | Student-t(5), log-normal scale | 1,000 / 2,500 / 5,000 | 21.2% / 13.3% / 9.0% | 1.3% / 2.3% / 1.5% |
-     | GJR-GARCH-t (project simulator, true forecasts) | 1,000 / 2,500 / 5,000 | 22.0% / 17.7% / 10.5% | 0.7% / 1.0% / 0.5% |
+     | Student-t(5), log-normal scale | 1,000 / 2,500 / 5,000 | 5.7% / 2.7% / 6.0% | 1.0% / 3.0% / 2.5% |
+     | GJR-GARCH-t (project simulator, true forecasts) | 1,000 / 2,500 / 5,000 | 7.3% / 4.7% / 2.5% | 0.0% / 0.7% / 0.5% |
+     | esreg itself, same designs (150 replications) | 1,000 / 2,500 / 5,000 | 2.7–8.7% | 0–2.7% |
 
-     Rates are over successful fits; unavailable fits were 0–3 per cell, all at T = 1,000.
-     (Rerun with the final code, after the tie fix below; the pre-fix run differed by at
-     most 3.7 points, within Monte Carlo error.) The strict test's over-size falls steadily with T, which
-     is compatible with a finite-sample distortion (it does not prove the cause).
-   - *Review round 2 (2026-11-10):* inputs are normalised by sd(loss) before fitting so that
-     availability and tolerances do not depend on units (slopes, Wald and t are invariant;
-     intercepts are scaled back); α ∈ (0, 1) and finite one-dimensional inputs are required.
-   - *Tie fix (2026-11-10, found by CI, before the logged results):* the LP quantile fit
-     interpolates a few observations exactly; whether they counted as below q depended on
-     the last floating-point bits, which moved the Wald by up to 5% between macOS and Linux.
-     Those observations are now classified as "not below" with a tolerance of
-     1e−7·(1 + max|Y|) in normalised units (asymptotically irrelevant: k points).
-     Power against ES 20% too small (T = 5,000): 100% for both in the first version; the
-     final version's power is checked in the tests (ES = truth/1.5 rejected at p < 0.001).
-     No reference implementation (R esreg) was available to compare against; instead a test
-     checks that a local optimiser cannot lower the joint FZ0 loss from our solution.
+     Unavailable fits: 0–4 per cell, all at T = 1,000. Power against ES 20% too small
+     (100 replications): strict 97–100%, intercept 99–100% at T = 2,500 and 5,000.
+   - *History.* Amendment 1 (first simulation): the location shift was added when a positive
+     fitted intercept made some e_t > 0. Amendment 2 (external review round 1): the
+     quantile was fitted unweighted and once (two-step, not joint FZ0) and only the
+     correctly-specified ES block of the covariance was used; replaced by the joint estimator
+     and a full sandwich with an empirical outer-product meat; degenerate samples no longer
+     abort the report. Amendment 3 (review round 2 and CI): unit normalisation, input
+     validation, and a tolerance for observations the LP fit interpolates (they had moved
+     the Wald by up to 5% between macOS and Linux). **Amendment 4 (2026-11-10, after the
+     first real-data ESR values were logged):** a cross-check against esreg showed that the
+     outer-product meat, not the test, caused the strict test's over-size (21% at T = 1,000,
+     9–10.5% at T = 5,000, where esreg has 2.7–8.7%); the covariance was replaced by the
+     esreg port above. The trigger was the reference check, not the real-data results; the
+     reading rule was kept, and the superseded real-data values remain in RESULTS_LOG.

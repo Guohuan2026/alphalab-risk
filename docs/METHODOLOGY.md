@@ -414,33 +414,43 @@ as saved. Command: `alphalab horizon --config <yaml>` → `horizon10.csv`.
 McNeil–Frey and Z2 ask whether ES is right *on average*. The expected-shortfall regression
 (ESR) backtest asks whether it is right *conditionally*: regress realised returns on the ES
 forecast in a joint quantile + ES regression, and test whether the ES equation is the identity.
-Returns convention: Y_t = −L_{t+1}, ê_t = −ES_t (forecast made at t).
+Returns convention: Y_t = −L_{t+1}, ê_t = −ES_t (forecast made at t). Reference
+implementation: the authors' R packages esreg 0.6.3 and esback 0.3.1.
 
 - *Estimation.* The joint M-estimator that minimises mean FZ0 loss (G1 = 0, G2(z) = −1/z,
-  the esreg default). Given e, the quantile part is a pinball loss weighted by 1/(−e_t),
-  solved exactly as a linear programme; given q, the ES part has the first-order condition
-  Σ X(e − S)/e² = 0 with S_t = q_t + (Y_t − q_t)·1[Y_t ≤ q_t]/α, solved by iterated weighted
-  least squares with step halving (all e_t < 0, loss never rises). The two blocks alternate
-  until the joint loss stops falling. As in esreg, Y is shifted by max(Y, 0) while fitting;
-  before that, losses and forecasts are divided by sd(loss), so the result does not depend
-  on units (tested at ×1e−5 … ×1e4).
-- *Covariance.* Full misspecification-robust sandwich for (β, γ): the bread includes the
-  quantile block (conditional density by Hendricks–Koenker difference quotients), the cross
-  blocks in (1[Y ≤ q] − α), and the ES block 1/e² − 2(e − S)/e³; the meat is the outer
-  product of the stacked scores. The ES block is used.
+  as `esback::esr_backtest`). Given e, the quantile part is a pinball loss weighted by
+  1/(−e_t), solved exactly as a linear programme; given q, the ES part has the first-order
+  condition Σ X(e − S)/e² = 0 with S_t = q_t + (Y_t − q_t)·1[Y_t ≤ q_t]/α, solved by iterated
+  weighted least squares with step halving. The blocks alternate until the joint loss stops
+  falling. Y is shifted by max(Y) while fitting (as esreg); before that, losses and forecasts
+  are divided by sd(loss), so the result does not depend on units.
+- *Covariance.* A formula-by-formula port of esreg's `vcovA` (nid density, "scl_sp"
+  truncated variance, misspecification terms). The bread uses the Hendricks–Koenker density
+  and a smoothed conditional CDF; the meat is model-based: the conditional truncated variance
+  of the quantile residuals from a Gaussian location-scale fit plus a Sheather–Jones kernel
+  density. esreg's fall-backs are kept. The one numerical deviation that matters: the
+  location-scale ML fit is iterated to convergence (esreg's stops early).
 - *Strict ESR:* regressors (1, ê_t) in both equations; H0 (γ0, γ1) = (0, 1); Wald test, χ²(2).
+  Secondary.
 - *One-sided intercept ESR:* Z_t = Y_t − ê_t, quantile on (1, ê_t), ES on a constant; H0
   γ0 = 0 against γ0 < 0 (ES understated); p = Φ(γ̂0/se). **This is the ESR result we read.**
 - *Unavailable results* (too few tail observations, constant forecast, failed fit,
   ill-conditioned sandwich) are NaN with a reason in `strict_status` / `int_status`; the
   other test still runs.
+- *Bootstrap.* `alphalab esr-bootstrap` computes esback's studentised pairs-bootstrap
+  p-values (B = 999) as a resumable job: deterministic per-chunk seeds, atomic chunk files,
+  a manifest that refuses mixed inputs, a worker cap, low priority, a wall-clock budget, a
+  lock file and a progress log. `--plan` estimates the run time; `--summarize` writes
+  `backtest_esr_bootstrap.csv`.
+
+Why the covariance matters (2026-11-10): an earlier version used the empirical outer
+product of the scores as the meat. It is consistent, but with heavy tails it was badly
+biased in finite samples: the strict test rejected a correct model 21% of the time at
+T = 1,000. esreg's model-based meat brings that to 2.5–7.3%.
 
 Validated in the tests: the LP quantile regression matches the order statistic and the
 weighted version matches replicated data; the intercept-only ES step equals the sample ES; a
-Nelder–Mead search cannot lower the joint FZ0 loss from our solution; with forecast ES =
-truth/1.5 the strict slope is about 1.5 and both tests reject. Simulated size at 5% with
-correct forecasts (Addition 9 has the table): strict 21–22% at T = 1,000, falling to 9–10.5%
-at T = 5,000; intercept 0.5–2.3% at every T (conservative). Observations the LP fit
-interpolates exactly are classified as "not below q" with a small tolerance, so results do
-not depend on the last floating-point bits (they did across macOS and Linux before). Output: `backtest_esr.csv`.
+Nelder–Mead search cannot lower the joint FZ0 loss from our solution; three fixed comparisons
+with esreg (5% tolerance); unit invariance and stability under last-bit perturbations;
+degenerate samples. Simulated size and power are in Addition 9. Output: `backtest_esr.csv`.
 Development samples only.

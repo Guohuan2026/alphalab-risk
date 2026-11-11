@@ -349,10 +349,10 @@ def test_esr_input_checks_and_degenerate_samples():
 
 
 def test_esr_size_under_null():
-    """Correct VaR/ES. Measured 2026-11-10 with the final code (rejections at 5%, 200-300
-    reps per cell, Addition 9): strict 21-22% (T=1000), 13-18% (2500), 9-10.5% (5000);
-    intercept 0.5-2.3% at every T. Here 60 reps of T = 2,000, so each rate has Monte Carlo
-    sd <= 0.05; bounds are about 3 sd above the measured rates at T = 2,500."""
+    """Correct VaR/ES. Measured 2026-11-10 with the esreg-ported covariance (rejections at
+    5%, 200-300 reps per cell, Addition 9): strict 2.7-7.0%, intercept 0-3.0% across
+    T = 1,000 / 2,500 / 5,000 and two DGPs (esreg itself: strict 2.7-8.7%). Here 60 reps of
+    T = 2,000: Monte Carlo sd <= 0.03, so the bounds are about 3 sd above 5%."""
     from alphalab.backtest import esr_backtest
     from alphalab.backtest.es import _t_tail
 
@@ -362,11 +362,47 @@ def test_esr_size_under_null():
     for _ in range(60):
         loss, s = _t_losses(rng, 2000, 5.0, np.exp(rng.normal(0, 0.4, 2000)) * 0.01)
         res = esr_backtest(loss, v * s, e * s, 0.025)
-        assert res.strict_status == "ok" and res.int_status == "ok"  # NaN must not pass
+        assert res.strict_status.startswith("ok") and res.int_status.startswith("ok")
         rs.append(res.strict_p < 0.05)
         ri.append(res.int_p < 0.05)
     assert np.mean(ri) <= 0.10  # conservative in finite samples
-    assert np.mean(rs) <= 0.32  # known over-size; guards against it getting worse
+    assert np.mean(rs) <= 0.15
+
+
+def _esreg_fixture(seed, es_factor):
+    """Deterministic series shared with the esreg cross-check (numpy's PCG64 is identical on
+    every platform)."""
+    from alphalab.backtest.es import _t_tail
+
+    rng = np.random.default_rng(seed)
+    v, e = _t_tail(0.025, 5.0)
+    sc = np.exp(rng.normal(0, 0.4, 2000)) * 0.01 * np.sqrt(3 / 5)
+    loss = rng.standard_t(5, 2000) * sc
+    return loss, v * sc, es_factor * e * sc
+
+
+@pytest.mark.parametrize(
+    "seed, es_factor, p_strict, p_int",
+    [
+        (101, 1.0, 0.872610337057335, 0.447952598122962),
+        (102, 1.0, 0.232504661906516, 0.255419423186717),
+        (103, 0.8, 0.232319473951386, 0.180563979534965),
+    ],
+)
+def test_esr_matches_esreg_reference(seed, es_factor, p_strict, p_int):
+    """Reference values from the authors' R packages (esreg 0.6.3 / esback 0.3.1,
+    esr_backtest versions 1 and 3, asymptotic), computed 2026-11-10 with esreg's location-
+    scale ML step iterated to convergence: unmodified esreg stops that optimisation early
+    (worse likelihood), which alone moved s103's Wald by 63%. Agreement on the statistics
+    within 5% (KDE: exact vs R's FFT binning; LP vs quantreg; optimiser tolerances)."""
+    from scipy import stats
+
+    from alphalab.backtest import esr_backtest
+
+    res = esr_backtest(*_esreg_fixture(seed, es_factor), 0.025)
+    assert res.strict_status == "ok" and res.int_status == "ok"
+    assert res.strict_wald == pytest.approx(stats.chi2.isf(p_strict, 2), rel=0.05)
+    assert res.int_t == pytest.approx(stats.norm.ppf(p_int), rel=0.05)
 
 
 @pytest.mark.parametrize("name, rejected", [("true", False), ("gjr", False), ("ewma", True)])

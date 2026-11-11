@@ -40,12 +40,29 @@ def main(argv: list[str] | None = None) -> int:
             "explain",
             "H4: permutation importance, SHAP and the Clarification-5 criteria (ML models)",
         ),
+        (
+            "esr-bootstrap",
+            "resumable bootstrap calibration of the ESR tests (development; Addition 9)",
+        ),
     ]:
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("--config", required=True, help="path to YAML config")
         if name == "build":
             sp.add_argument("--snapshot", default="latest", help="snapshot id or 'latest'")
             sp.add_argument("--force", action="store_true", help="build despite validation errors")
+        if name == "esr-bootstrap":
+            from alphalab.backtest.esr_bootstrap import BootstrapSettings as _BS
+
+            d = _BS()
+            sp.add_argument("--reps", type=int, default=d.reps, help="bootstrap resamples")
+            sp.add_argument("--chunk", type=int, default=d.chunk, help="resamples per chunk")
+            sp.add_argument("--seed", type=int, default=d.seed)
+            sp.add_argument("--workers", type=int, default=d.workers, help="processes")
+            sp.add_argument("--nice", type=int, default=d.nice, help="CPU priority increment")
+            sp.add_argument("--max-hours", type=float, default=None, help="wall-clock budget")
+            mode = sp.add_mutually_exclusive_group()
+            mode.add_argument("--plan", action="store_true", help="estimate only; no work")
+            mode.add_argument("--summarize", action="store_true", help="write p-values")
         if name in ("forecast", "backtest"):
             sp.add_argument(
                 "--include-lockbox",
@@ -102,6 +119,35 @@ def main(argv: list[str] | None = None) -> int:
         with pd.option_context("display.width", 140, "display.max_colwidth", 80):
             print(t["criteria"].to_string(index=False))
             print(t["check"].to_string(index=False))
+    elif args.command == "esr-bootstrap":
+        import json
+        from pathlib import Path
+
+        from alphalab.backtest import esr_bootstrap as eb
+
+        s = eb.BootstrapSettings(
+            reps=args.reps,
+            chunk=args.chunk,
+            seed=args.seed,
+            workers=args.workers,
+            nice=args.nice,
+            max_hours=args.max_hours,
+        )
+        root, cells = eb.cells_from_config(cfg)
+        if args.summarize:
+            t = eb.summarize(root, s)
+            out = root.parent / "backtest_esr_bootstrap.csv"
+            t.to_csv(out, index=False)
+            with pd.option_context("display.width", 140, "display.float_format", "{:.4g}".format):
+                print(t.to_string(index=False))
+            print(f"wrote {out}")
+        elif args.plan:
+            print(json.dumps(eb.plan(root, cells, s), indent=2))
+        else:
+            run_name = Path(args.config).stem
+            print(
+                json.dumps(eb.run(root, cells, s, Path("logs") / f"esr_bootstrap_{run_name}.log"))
+            )
     elif args.command == "snapshots":
         for s in RawSnapshotStore(cfg.data_dir).list(cfg.provider):
             print(s)

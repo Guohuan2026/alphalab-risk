@@ -89,13 +89,22 @@ they can distort conclusions.
     Only 4–7 breaches are expected at 1% (414–653 non-overlapping windows), so no tests are
     run. Development samples only.
 
-17. **ESR backtest: added late, asymptotic p-values with poor finite-sample size
-    (Addition 9).** The ESR test was not pre-registered; it was added on 2026-11-10, after
-    the lockbox was opened, so it is exploratory and run on development samples only. Its
-    p-values are asymptotic. With correct forecasts in two simulated designs, the strict
-    (two-sided) version rejected 21–22% of the time at the 5% level for T = 1,000 and 9–10.5%
-    for T = 5,000, so strict-ESR p-values are shown but not read as 5% tests. The one-sided
-    intercept test rejected only 0.5–2.3%: it is conservative, so not rejecting is weak
-    evidence that ES is adequate. These sizes come from two data-generating processes and
-    may differ for real returns. The estimator was not compared with the authors' R package
-    (esreg; R is not installed); joint optimality is checked numerically instead.
+17. **ESR backtest: added late; asymptotic p-values; one fragile series (Addition 9).** The
+    ESR test was not pre-registered; it was added on 2026-11-10, after the lockbox was
+    opened, so it is exploratory and run on development samples only.
+    - *Size:* with correct forecasts in two simulated designs the strict test rejected
+      2.5–7.3% of the time at the 5% level and the one-sided intercept test 0–3%. The
+      intercept test is conservative, so not rejecting is weak evidence that ES is adequate.
+      These sizes come from two data-generating processes and may differ for real returns.
+      Bootstrap p-values (esback's studentised pairs bootstrap) are implemented but not yet
+      computed (about 13 CPU-hours with 4 workers); the iid bootstrap ignores any serial
+      dependence left in the ESR scores.
+    - *Covariance depends on a location-scale model.* esreg's variance estimator (ported here)
+      models Y's conditional mean and scale as linear in the forecast. Where that fit is
+      poor or has several optima (lasso QR, whose ES forecasts are heavily floored and tied),
+      results can differ between implementations: up to about 40% in the intercept t-statistic
+      against esreg for lasso QR, against < 5% for every other model.
+    - *Reference differences:* the port matches esreg to a median 0.5% (Wald) when esreg's
+      own location-scale optimisation is run to convergence. Unmodified esreg stops that
+      optimisation early, which alone changes its Wald by up to ~60% on some series; our
+      numbers therefore differ from a plain `esback::esr_backtest` call on those series.
