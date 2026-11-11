@@ -71,6 +71,12 @@ def main(argv: list[str] | None = None) -> int:
             sp.add_argument(
                 "--only", default=None, help="regex on cell keys, e.g. '_0.025$' (sensitivity runs)"
             )
+            sp.add_argument(
+                "--legacy-esreg-start",
+                action="store_true",
+                help="esreg's location-scale start (degenerate in some draws): ONLY to resume or "
+                "summarise the legacy run; new runs use robust starts (Addition 9, amendment 9)",
+            )
             mode = sp.add_mutually_exclusive_group()
             mode.add_argument("--plan", action="store_true", help="estimate only; no work")
             mode.add_argument("--summarize", action="store_true", help="write p-values")
@@ -158,9 +164,11 @@ def main(argv: list[str] | None = None) -> int:
             nice=args.nice,
             max_hours=args.max_hours,
             block=args.block,
+            robust_scale=not args.legacy_esreg_start,
+            allow_legacy_start=args.legacy_esreg_start,
         )
-        root, cells = eb.cells_from_config(cfg)
-        root = eb.root_for(root, args.block)
+        root, cells = eb.cells_from_config(cfg, robust=s.robust_scale)
+        root = eb.root_for(root, args.block, robust=s.robust_scale)
         if args.only:
             import re
 
