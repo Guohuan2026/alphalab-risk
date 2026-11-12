@@ -24,7 +24,10 @@ uses FZ0.
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import warnings
+import zlib
 from dataclasses import asdict, dataclass
 
 import numpy as np
@@ -312,6 +315,110 @@ def _hall_sheather(n: int, alpha: float) -> float:
 # esreg, so the misspecification terms that involve q in levels match.
 
 
+# ---- robust location-scale mode (opt-in; Addition 9, amendment 9) ---------------------------
+# None = esreg behaviour (the default, used by every result so far). Otherwise a dict with
+# "b2": warm-start scale coefficients (full-sample estimate) or None, and "trace": a list
+# that records which start succeeded (for failure-rate reporting).
+_ROBUST_LS: contextvars.ContextVar = contextvars.ContextVar("robust_ls", default=None)
+
+# ---- covariance variant (Addition 9, amendment 10; EXPLORATORY, post-lockbox) ---------------
+# "scl_sp"   : esreg vcovA(sigma_est="scl_sp", misspec=TRUE): the pre-registered default.
+# "ind_nomis": esreg vcovA(sigma_est="ind", misspec=FALSE): PRIMARY amended studentisation.
+#              Every misspecification term in esreg's sandwich is a multiple of (cdf - alpha),
+#              so misspec=FALSE is exactly cdf = alpha; no location-scale fit is run at all.
+# "ind_mis"  : esreg vcovA(sigma_est="ind", misspec=TRUE): SECONDARY (sensitivity). The cdf
+#              terms still need the location-scale fit; a degenerate start or an end solution
+#              with min/median fitted sd < END_RATIO_MIN (amendment 8(d)(2)) is a failed fit.
+COV_VARIANTS = ("scl_sp", "ind_nomis", "ind_mis")
+END_RATIO_MIN = 0.05
+_COV_VARIANT: contextvars.ContextVar = contextvars.ContextVar("cov_variant", default="scl_sp")
+
+
+@contextlib.contextmanager
+def cov_variant(name: str):
+    """Use covariance variant ``name`` (see COV_VARIANTS) inside the block."""
+    if name not in COV_VARIANTS:
+        raise ValueError(f"unknown covariance variant {name!r}; choose from {COV_VARIANTS}")
+    tok = _COV_VARIANT.set(name)
+    try:
+        yield
+    finally:
+        _COV_VARIANT.reset(tok)
+
+
+@contextlib.contextmanager
+def robust_scale(b2_start=None, trace: list | None = None):
+    """Within this block the location-scale fit uses the robust starts and raises on an
+    invalid scale instead of returning esreg's degenerate start."""
+    tok = _ROBUST_LS.set(
+        {"b2": None if b2_start is None else np.asarray(b2_start, float), "trace": trace}
+    )
+    try:
+        yield
+    finally:
+        _ROBUST_LS.reset(tok)
+
+
+def _ls_optimise(y: np.ndarray, x: np.ndarray, b0: np.ndarray) -> tuple[np.ndarray, float]:
+    """Gaussian location-scale ML (sd linear in x) from b0, BFGS restarted to convergence.
+    Returns (b, negative log-likelihood); nll is inf if b0 is infeasible."""
+    from scipy import stats
+    from scipy.optimize import minimize
+
+    k = x.shape[1]
+
+    def nll_grad(par):
+        mu, sig = x @ par[:k], x @ par[k:]
+        if not np.all(sig > 0):
+            return np.inf, np.zeros_like(par)
+        r = (y - mu) / sig
+        val = -float(np.sum(stats.norm.logpdf(r) - np.log(sig)))
+        return val, np.concatenate([x.T @ (-(r / sig)), x.T @ (1 / sig - r**2 / sig)])
+
+    b, best = b0, nll_grad(b0)[0]
+    if not np.isfinite(best):
+        return b0, np.inf
+    with np.errstate(invalid="ignore", over="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        for _ in range(20):
+            res = minimize(nll_grad, b, jac=True, method="BFGS", options={"gtol": 1e-10})
+            if not (np.isfinite(res.fun) and res.fun < best - 1e-12 * (1 + abs(best))):
+                break
+            b, best = res.x, float(res.fun)
+    return b, best
+
+
+def _cond_mean_sigma_robust(y: np.ndarray, x: np.ndarray, mode: dict):
+    """Robust starts: (1) warm start = full-sample scale coefficients (feasible on any
+    resample, since a resample's x rows are full-sample rows), mean from OLS; (2) esreg's
+    start with the smallest fitted sd raised to 0.001 (esreg's evident intent); (3) eight
+    random starts around (2), seeded by the data. First feasible optimum wins; an invalid
+    scale raises ESRFitError (the draw then counts as failed)."""
+    k = x.shape[1]
+    b1 = np.linalg.lstsq(x, y, rcond=None)[0]
+    b2c = np.linalg.lstsq(x, np.abs(y - x @ b1), rcond=None)[0]
+    b2c[0] += max(0.0, 0.001 - float(np.min(x @ b2c)))
+    starts = []
+    if mode["b2"] is not None and np.all(x @ mode["b2"] > 0):
+        starts.append(("warm", mode["b2"]))
+    starts.append(("corrected", b2c))
+    rng = np.random.default_rng(zlib.crc32(np.ascontiguousarray(y).tobytes()))
+    for i in range(8):
+        b2r = b2c * np.exp(rng.normal(0, 0.5, k))
+        b2r[0] += max(0.0, 0.001 - float(np.min(x @ b2r)))
+        starts.append((f"random{i}", b2r))
+    for name, b2 in starts:
+        b, nll = _ls_optimise(y, x, np.concatenate([b1, b2]))
+        mu, sig = x @ b[:k], x @ b[k:]
+        if np.isfinite(nll) and np.all(np.isfinite(mu)) and np.all(sig > 0):
+            if mode["trace"] is not None:
+                mode["trace"].append(name)
+            return mu, sig
+    if mode["trace"] is not None:
+        mode["trace"].append("failed")
+    raise ESRFitError("location-scale fit invalid from every start")
+
+
 def _cond_mean_sigma(y: np.ndarray, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """esreg conditional_mean_sigma: Gaussian ML of y ~ N(x b1, (x b2)^2), started from OLS
     of y and of |residual| on x; BFGS, then Nelder–Mead, else the starting values.
@@ -323,6 +430,9 @@ def _cond_mean_sigma(y: np.ndarray, x: np.ndarray) -> tuple[np.ndarray, np.ndarr
     from scipy import stats
     from scipy.optimize import minimize
 
+    mode = _ROBUST_LS.get()
+    if mode is not None:
+        return _cond_mean_sigma_robust(y, x, mode)
     k = x.shape[1]
     b1 = np.linalg.lstsq(x, y, rcond=None)[0]
     b2 = np.linalg.lstsq(x, np.abs(y - x @ b1), rcond=None)[0]
@@ -478,7 +588,18 @@ def _cond_trunc_var(u: np.ndarray, x: np.ndarray, approach: str) -> tuple[np.nda
 
 def _cdf_at_quantile(y: np.ndarray, x: np.ndarray, q: np.ndarray) -> np.ndarray:
     """esreg cdf_at_quantile: empirical CDF of location-scale standardised y at q."""
+    if _COV_VARIANT.get() == "ind_mis":  # amendment 10 (V1): boundary fits are failed fits
+        from alphalab.backtest.esr_bootstrap import degenerate_start
+
+        if degenerate_start(y, x):
+            raise ESRFitError("degenerate location-scale start (cdf terms)")
     mu, sig = _cond_mean_sigma(y, x)
+    if _ROBUST_LS.get() is not None and not (np.all(np.isfinite(mu)) and np.all(sig > 0)):
+        raise ESRFitError("invalid location-scale fit")  # Codex round 4 (robust mode)
+    if _COV_VARIANT.get() == "ind_mis" and not (
+        np.all(np.isfinite(sig)) and np.min(sig) / np.median(sig) >= END_RATIO_MIN
+    ):
+        raise ESRFitError("location-scale fit ends on the zero-sd boundary (cdf terms)")
     v = np.sort((y - mu) / sig)
     # cdf_i = share of j with v_j - z_i <= 0, with the tie band of _at_or_below (points the
     # LP fit interpolates sit exactly at q; R's ecdf counts them when equality is exact).
@@ -526,8 +647,11 @@ def _joint_cov(
         raise ESRFitError("fitted ES must be negative")
     simple = kq == 1 and ke == 1  # esreg switches to iid sparsity and ind variance here
     f = _density_at_quantile(y, xq, y - q, alpha, "iid" if simple else "nid")
-    cdf = _cdf_at_quantile(y, xq, q)
-    cv, approach = _cond_trunc_var(y - q, xq, "ind" if simple else "scl_sp")
+    variant = _COV_VARIANT.get()
+    # misspec = FALSE (ind_nomis): cdf = alpha, so no location-scale fit is run
+    cdf = np.full(n, alpha) if variant == "ind_nomis" else _cdf_at_quantile(y, xq, q)
+    cv_approach = "ind" if (simple or variant != "scl_sp") else "scl_sp"
+    cv, approach = _cond_trunc_var(y - q, xq, cv_approach)
     g2, g2p, g2pp = -1 / e, 1 / e**2, -2 / e**3
     m = (cdf - alpha) / alpha
 
@@ -677,7 +801,8 @@ def esr_backtest(loss, var, es, alpha: float, min_tail: int = 10) -> ESRResult:
                 raise ESRFitError("covariance is not positive definite")
             sg0, sg1 = float(g[0] * unit), float(g[1])
             p_strict = float(stats.chi2.sf(wald, 2))
-            s_status = "ok" if s_var == "scl_sp" else f"ok ({s_var} variance fallback)"
+            s_exp = "scl_sp" if _COV_VARIANT.get() == "scl_sp" else "ind"
+            s_status = "ok" if s_var == s_exp else f"ok ({s_var} variance fallback)"
         except (ESRFitError, np.linalg.LinAlgError) as err:
             sg0 = sg1 = wald = np.nan
             s_status = str(err)
@@ -689,7 +814,9 @@ def esr_backtest(loss, var, es, alpha: float, min_tail: int = 10) -> ESRResult:
         t = g0n / se
         g0 = g0n * unit
         p_int = float(stats.norm.cdf(t))
-        expected = "scl_sp" if x.shape[1] > 1 else "ind"  # esreg's own choice for kq = ke = 1
+        expected = (  # esreg's own choice for kq = ke = 1; "ind" under amendment 10
+            "scl_sp" if x.shape[1] > 1 and _COV_VARIANT.get() == "scl_sp" else "ind"
+        )
         i_status = "ok" if i_var == expected else f"ok ({i_var} variance fallback)"
     except (ESRFitError, np.linalg.LinAlgError) as err:
         g0 = t = p_int = np.nan

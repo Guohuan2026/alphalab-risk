@@ -1,0 +1,136 @@
+# Delegated decisions log
+
+Decisions made on Codex's recommendation under the CLAUDE.md "Ask Codex" rule. One entry per decision: date, question, Codex's answer, action taken.
+
+
+## 2026-11-11 — ESR robust-start validation thresholds (Addition 9, amendment 9; exploratory)
+
+**Q1. Start-invariance tolerance.** On bootstrap draws and full samples where both esreg's
+location-scale start and the warm start succeed, what difference counts as "numerically
+identical"? Options: 1e-8, 1e-6 or 1e-4 (relative for Wald/t, absolute for p-values).
+**Codex (codex exec, session 01a1c907):** 1e-6 relative for Wald/t and 1e-6 absolute for
+p-values, with an absolute-tolerance fallback near zero, because relative differences are
+unstable for near-zero statistics while 1e-6 is still stringent.
+**Action:** criterion |Δ| ≤ 1e-6 · max(1, |x|) for W and t, |Δp| ≤ 1e-6, fixed before the
+comparison was computed.
+
+**Q2. Pilot failure gate (user: "under 1–2%").** Options: pooled < 2%; every non-quarantined
+real cell and every simulation design individually < 2% with the upper 95% Wilson bound
+reported; pooled non-quarantined < 1%.
+**Codex:** each non-quarantined real cell and each simulation design individually < 2%, Wilson
+upper bound reported, because pooling can hide an unstable cell; quarantined lasso-QR cells
+stay excluded until cleared separately.
+**Action:** adopted as the launch gate; quarantined cells reported but not gating. Launching
+the overnight run additionally needs the user's approval (CLAUDE.md: jobs > 2 hours).
+
+## 2026-11-11 00:35 — overnight plan under the owner's pre-approvals (tonight only)
+
+Owner pre-approved (asleep): push `esr-robust-start`; launch the robust overnight bootstrap
+(--max-hours 8) if every non-quarantined real pilot cell and every simulation design has a
+failure rate < 2% AND the start-invariance check passes; otherwise ask Codex what to
+investigate. Questions put to Codex (codex exec), with its answers and the action taken:
+
+- **Q1. Legacy run while the robust run goes?** Codex: stop the legacy run once the pilot
+  passes, preserving its checkpoints, so the robust draws that supersede it get the compute.
+  **Action:** if (and only if) the robust run launches, stop the legacy session (script first,
+  so it cannot move on to P2), keeping every saved chunk; in-progress chunks are lost, saved
+  ones are untouched (atomic writes).
+- **Q2. Quarantined lasso-QR cells in the robust run?** Codex: exclude them; robust starts do
+  not establish the separate validation they need. **Action:** `--only '^(?!linqr_l1_)'`.
+- **Q3. Config order within 8 h?** Codex: P1, P2, P3, then P1-rolling (primary result first,
+  then breadth, then the robustness check). **Action:** adopted.
+- **Q4. Push despite the owner's pre-push hook (allows only alphalab-risk)?** Codex: leave
+  the branch unpushed and report; approval to push is not explicit approval to bypass the
+  owner's safeguard. **Action:** not pushed (no --no-verify); reported in the morning summary.
+
+## 2026-11-11 06:45 — robust-start gate failed; next step (Codex)
+
+**Gate result (owner's pre-approved rule):** pilot PASS (2,600 draws, 0 failures, Wilson upper
+bound 1.9% per group); start-invariance FAIL (real data 297/297 within 1e-6, sim A within
+3e-9, but sims B1/B2 24 of 285 samples beyond tolerance, e.g. Wald 3.14 vs 10.08). **Action:
+overnight robust run NOT launched.** (The legacy session had already ended at its 04:47
+budget, so Q1 of 00:35 did not arise.) Diagnosis: in 22 of 24 divergent samples esreg's end
+solution has min fitted sd ≈ 0 (the linear-sd Gaussian likelihood is unbounded as an sd → 0);
+the warm start usually, not always, finds an interior optimum.
+**Question to Codex:** what next? (a) end-solution validity check + re-audit; (b) constrained
+or log-linear scale model; (c) multi-start, keep highest likelihood; (d) use 'ind' variance.
+**Codex:** (a): add an end-solution check (min/median fitted sd below a predefined threshold
+→ failed draw) for both starts, re-audit legacy, real and pilot draws, report flagged draws
+as failures, examine sensitivity; with an unbounded likelihood a higher likelihood cannot
+identify the better fit, so multi-start alone cannot resolve it.
+**Action:** threshold 0.05 = the interior criterion already pre-specified in amendment 8(d)(2)
+(no new number chosen after seeing results); sensitivity at 0.01 and 0.10.
+
+## 2026-11-11 07:30 — end-solution audit result; estimator choice escalated to the owner
+
+**Audit** (`esr_endaudit`, threshold 0.05 = amendment 8(d)(2); output
+`data/results/esr_pilot/end_solution_by_group.csv`): legacy P1 draws, 22 non-lasso cells,
+0 of 21,879 flagged (min ratio ≥ 0.22); lasso flags all coincide with degenerate starts.
+Robust real-data pilot, 0 of 1,400 flagged. Simulations (robust start): A 2–3%, B1 22–24%,
+B2 31–32% flagged. The boundary is an estimator limitation of the linear-sd scale model,
+growing under the misspecification the test should detect; the pre-specified size
+simulation cannot be evaluated with these failure rates.
+**Question to Codex:** keep scl_sp and report failures / switch to 'ind' covariance /
+log-linear scale / unstudentised bootstrap? **Codex:** switch the bootstrap studentisation to
+esreg's 'ind' covariance by a frozen amendment (post-lockbox, exploratory), keep the ≤ 6.4%
+criterion, re-run A/B1/B2, and report the scl_sp results as motivation.
+**Action:** NOT implemented. This changes the pre-registered estimator, which CLAUDE.md
+reserves for the owner ("Changing the pre-registered research design"). Escalated in the
+morning summary. No overnight run launched.
+
+## 2026-11-11 — amendment 10: which "ind" variant to freeze (owner approved the switch to ind)
+
+**Finding:** esreg's `sigma_matrix`/`lambda_matrix` always call `cdf_at_quantile` (the same
+location-scale fit) and use it when misspec = TRUE; all misspecification terms are multiples
+of (cdf − α). So sigma_est = "ind" alone does not remove the scale fit.
+**Question to Codex:** freeze V1 (ind, misspec = TRUE) or V2 (ind, misspec = FALSE)?
+**Codex:** freeze V2 as an explicitly clarified amendment (it fulfils the stated purpose);
+report V1 as a secondary sensitivity with its failure rule; distinguish the ESR coefficient
+null from correct specification (V2 imposes cdf = α; adequacy to be shown by simulation);
+check against R esback/esreg; apply the gate to V2, never pick whichever variant passes.
+**Action:** adopted; frozen in RESEARCH_DESIGN amendment 10 before any amended simulation ran.
+
+## 2026-11-11 18:10 — Codex review of amendment 10 implementation
+
+**Codex:** algebra OK (cdf = α ≡ misspec = FALSE, all Λ/Σ blocks match esreg), default path
+unchanged, pairing preserved, assumptions honestly stated. MAJOR: the summary could pass on
+survivors only (full-sample failures excluded, incomplete run accepted). MINORs: failure
+counts/Wilson intervals missing; asymptotic sd at nominal 5%; crash if all fits fail.
+**Action:** all adopted in `esr_sim.summarize` (completeness + ≤ 5% full-sample failures
+required; Wilson CIs; per-test failure counts; observed-rate sd; "unavailable" row), recorded
+as amendment 10(j) before any amended result was read; threshold 6.4% unchanged. Not
+adopted: per-test (instead of either-test) draw-failure gating; kept, as the more
+conservative existing rule (amendment 7(c)).
+
+## 2026-11-11 18:16 EST — autonomous run started (CLAUDE.md "Autonomous run rules")
+
+Start 18:16:02 EST; hard stop 20:16 EST; summary goes to RUN_SUMMARY.md.
+**Reconciling the two CLAUDE.md sections (my reading, no question needed):** "Autonomous run
+rules" replace *asking* the user, but not the "Always ask Guohuan" list. Items on that list
+(deleting data, rewriting history, pushing, the lockbox, jobs > 2 h or costing money, changing
+the pre-registered design) are neither done nor delegated during the run: they are left for
+the owner and listed in RUN_SUMMARY.md. Codex timeout is 10 min (new rule), after which I
+choose, log, and continue. Owner's standing limits from the amendment-10 approval also hold:
+no real-data bootstrap launch, no --no-verify, no estimator changes to obtain a pass.
+**Plan:** wait for the V2/V1 simulations (running since 18:08), apply the frozen gate
+(amendment 10(f), 10(j)), report GO/NO-GO; if GO, estimate the real-data cost only.
+
+## 2026-11-11 19:40 EST — amendment 10 gate applied (no discretion involved)
+
+Frozen rule (10(f), 10(j)) applied mechanically: V2 NO-GO for strict and intercept (block 20:
+strict B1 11.7%, B2 25.4%; intercept B1 8.5%, B2 16.6% > 6.4%); V1 unusable (10–44% failed
+full-sample fits). Per 10(g): estimator work stopped, nothing launched. Next-milestone
+recommendation requested from Codex (Agent HUD message m-b5125423b0e5, 19:42).
+**Codex (19:42, Agent HUD):** agrees NO-GO for both tests; recommends as the next milestone a
+new amendment retiring ESR inference to descriptive status, keeping descriptive results, with
+the other backtests calibrated for dependence separately. **Action:** recorded as the
+recommendation to the owner in RUN_SUMMARY.md; not implemented (design change → owner).
+Run stopped at 19:42 EST, before the 20:16 hard stop: no remaining step is permitted without
+the owner (design change, real-data launch, push, merge).
+**Codex full reply (m-9710261fed41):** confirms NO-GO (Monte Carlo uncertainty does not alter
+the pre-specified decision; V2's complete availability resolves its earlier selection
+concern). Recommendation unchanged: retire ESR p-values and GO decisions from inferential use,
+keep ESR estimates/statistics descriptively; other backtests need their own dependence-robust
+calibration. Caveats: HAC studentisation, longer blocks or score bootstraps would each be a new
+research programme needing fresh validation (these results do not show which would work), and
+HAC plus a block bootstrap must not be described as automatically pivotal.

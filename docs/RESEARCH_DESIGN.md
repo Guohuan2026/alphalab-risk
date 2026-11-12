@@ -634,3 +634,96 @@ Format: date · section · change · reason · made before/after seeing affected
      block-sensitive (6(iii)) is "inconclusive". A model is GO for a test where all of its
      cells are GO. Every result keeps its label: exploratory, development sample, added
      after the lockbox was opened; none of it is held-out evidence.
+     **Amendment 9 (2026-11-11; EXPLORATORY, added after the lockbox was opened; development
+     sample only). Robust location-scale starts: tried, and not adopted.** (a) *Change
+     tried:* each fit warm-started from the full-sample scale estimate, then the corrected
+     start (min sd 0.001), then 8 seeded random starts; an invalid sd is a failed fit
+     (`es.robust_scale`, estimator version `esr-2026-11-11-robust-ls-warmstart-v1`; the
+     overnight job refuses esreg's start unless resuming the legacy run). (b) *Gate, fixed
+     before results (Codex, docs/DECISIONS.md):* pilot failure rate < 2% in every
+     non-quarantined real cell and every simulation design, AND start-invariance (|ΔW|,
+     |Δt| ≤ 1e-6·max(1, |x|), |Δp| ≤ 1e-6 wherever esreg's start is valid). (c) *Result:*
+     pilot passed (2,600 samples, 0 failures; Wilson upper bound 1.9% per group);
+     start-invariance failed (real data 297/297 and design A within tolerance; designs B1/B2
+     24 of 285 outside, e.g. W 3.14 vs 10.08). (d) *Cause:* the auxiliary Gaussian
+     likelihood with sd linear in (1, ê) is unbounded as a fitted sd → 0, so a fit can END on
+     that boundary from a valid start. End-solution audit (flag: min/median fitted sd < 0.05,
+     the amendment 8(d)(2) criterion): legacy P1 draws 0 of 21,879 flagged outside lasso QR;
+     robust real-data pilot 0 of 1,400; simulations A 2–3%, B1 22–24%, B2 31–32%. The
+     scale-based covariance therefore cannot support the amendment 6 size check. The robust
+     run was not launched; its code is kept for reproducibility only.
+     **Amendment 10 (2026-11-11, frozen before any amended simulation was run; EXPLORATORY,
+     added after the lockbox was opened, approved by the owner). Studentisation by esreg's
+     independence covariance.** This does not replace the pre-registered method or any
+     earlier result; it is a separately versioned exploratory variant.
+     (a) *Why the original failed:* amendment 9(d): the scl_sp truncated variance and, via
+     `cdf_at_quantile`, the misspecification terms both use the location-scale fit, whose
+     boundary solutions are frequent exactly under the persistent-volatility designs.
+     (b) *Variant (primary, V2):* esreg `vcovA(sigma_est = "ind", sparsity = "nid",
+     misspec = FALSE)`; in code `cov_variant("ind_nomis")`. esreg 0.6.3 always calls
+     `cdf_at_quantile` and uses it when misspec = TRUE; every misspecification term in its
+     sandwich (`sandwich_loops.cpp`) is a multiple of (cdf − α), so misspec = FALSE is
+     exactly cdf = α. Only V2 removes the auxiliary fit, which is the purpose of the switch
+     (Codex recommendation, docs/DECISIONS.md). Tail variance = sample variance of the
+     quantile residuals at or below 0 (constant over t); density by the nid quantile
+     regression difference quotient (Hall–Sheather), unchanged.
+     (c) *Secondary (sensitivity, V1):* `vcovA(sigma_est = "ind", misspec = TRUE)`,
+     `cov_variant("ind_mis")`, with esreg's start; a degenerate start or an end solution with
+     min/median fitted sd < 0.05 is a failed fit (counted, never dropped silently). V1 is
+     reported beside V2 but cannot replace it: the gate below is applied to V2, and the
+     variant is not chosen by which one passes.
+     (d) *Assumptions that remain:* V2 imposes cdf = α at the fitted quantile in the
+     covariance; the ESR coefficient null does not by itself make every misspecification
+     term vanish, so V2's adequacy is an empirical question for the simulation, not a
+     theorem. Neither variant estimates the long-run (HAC) variance: under serial dependence
+     the iid-studentised statistic is not pivotal, and the circular block bootstrap is at
+     best first-order valid, conditionally on stationarity, strong mixing, moment and
+     regularity conditions, with the block length growing suitably with T. A passing size
+     check in designs A/B1/B2 supports, but does not prove, validity on the real series; the
+     absence of numerical failures is not evidence of valid inference.
+     (e) *Validation (amendment 6(i), unchanged):* designs A, B1, B2, T = 2,500, R = 1,000,
+     seed 20261111, the same replications and resamples as the scl_sp run (paired),
+     asymptotic, iid and block 10/20/40 by warp speed. V2 is run first, then V1 (each about
+     0.5 h on 4 low-priority cores; output folders `n2500_reps1000_seed20261111_cov-<variant>`).
+     (f) *Acceptance (amendment 6(ii) and 8(e), unchanged, not revisited after results):*
+     per test, V2's block bootstrap is GO if its 5% rejection rate at block 20 is ≤ 6.4% in
+     A, B1 and B2; restricted GO (short-memory dependence only) if it fails in B2 only;
+     NO-GO otherwise. A method with > 5% failed draws, or an empty pool, is unusable
+     (amendment 7(c)), which counts as failing. Reported with each rate: binomial/Wilson 95%
+     interval, Monte Carlo sd from resampling replications (including the pooled critical
+     value), full-sample and draw failure counts, and blocks 1/10/40 as sensitivity.
+     (g) *If V2 fails:* work stops; the remaining problem is reported to the owner; the
+     estimator is not modified further to obtain a pass.
+     (h) *Reference check (done before the simulation):* with coefficients fixed, V2's ES
+     covariance equals R esreg's to ≤ 1e-13 relative in 25 of 30 comparisons (6 real cells
+     and 9 simulated samples, strict and intercept). The 5 others (up to 2% in the ES
+     covariance) are entirely the documented tie policy: esreg uses `u <= 0` for the tail
+     variance, so whether the quantile regression's interpolated points (residual ≈ ±1e-16)
+     enter depends on rounding; the port counts them by the tie band (`TIE_RTOL`). With the
+     exact rule the port reproduces esreg's tail variance to 10 digits. V1 agrees to ≤ 1.2%
+     (its location-scale fit converges further than R's optim defaults), and fails where the
+     fit ends on the boundary, as specified.
+     (i) *Real data:* only after a GO, and only with the owner's approval of the cost; new
+     estimator version, separate folders; no earlier checkpoint is overwritten.
+     (j) *Addendum (2026-11-11 18:10 EST, from Codex's review of the implementation; added while
+     the V2 simulation was running and before any amended result was read; the 6.4%
+     threshold is unchanged):* a method is usable only if the run is complete (all 1,000
+     replications), at most 5% of replications fail their full-sample fit, AND at most 5% of
+     the surviving replications' draws fail; otherwise it counts as failing (f). This closes
+     a gap where rates computed on the surviving replications alone could pass under heavy
+     attrition. Rejection rates are reported with Wilson 95% intervals and explicit
+     full-sample and per-test draw-failure counts; asymptotic sds use the observed rate.
+     Applied identically to every variant, so the earlier scl_sp result read with this rule
+     is also unusable in design A (69 of 1,000 full samples degenerate); its saved file is
+     kept as written.
+     (k) *Result (2026-11-11 19:40 EST; gate applied as frozen):* both runs complete
+     (R = 1,000, paired). **V2: NO-GO for both tests.** Zero full-sample and zero draw
+     failures. 5% rejection at block 20 (Wilson 95%): strict A 5.6% [4.3, 7.2], B1 11.7%
+     [9.9, 13.8], B2 25.4% [22.8, 28.2]; intercept A 3.5% [2.5, 4.8], B1 8.5% [6.9, 10.4],
+     B2 16.6% [14.4, 19.0]. It fails in B1, not only B2, so not even the restricted GO
+     applies. Blocks 10/40: strict B1 15.3/10.1%, B2 36.8/19.8%; intercept B1 8.6/5.5%,
+     B2 18.4/14.5%; the iid bootstrap is worst (strict B1 24.5%, B2 44.7%). Longer blocks
+     help monotonically but no block tested reaches the threshold in B2, so the bootstrap
+     only partly accounts for the serial dependence. Asymptotic p-values: NO-GO (strict A
+     11.0%, B1 38.3%, B2 58.6%). **V1: unusable** (full-sample fit failures A 98, B1 409, B2
+     437 of 1,000). Per (g), work on the estimator stopped; ESR p-values remain descriptive.

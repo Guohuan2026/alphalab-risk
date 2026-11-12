@@ -21,7 +21,7 @@ def _series(seed=7, n=800, es_factor=1.0):
 
 @pytest.fixture(scope="module")
 def cell():
-    c = eb.make_cell("sim_0.05", *_series(), 0.05)
+    c = eb.make_cell("sim_0.05", *_series(), 0.05, robust=True)
     assert c is not None
     return c
 
@@ -85,7 +85,7 @@ def test_run_resume_and_summary(tmp_path, cell):
     assert row.complete and row.reps_done == 6
     assert 0 <= row.strict_p_boot <= 1 and 0 <= row.int_p_boot <= 1
     man = json.loads((d / "manifest.json").read_text())
-    assert man["estimator_version"] == eb.ESTIMATOR_VERSION
+    assert man["estimator_version"] == eb.ROBUST_VERSION and man["robust_scale"]
     assert man["scheme"] == "circular block" and man["block"] == 10  # ceil(800^(1/3))
     assert row.scheme == "circular block" and row.block == 10
 
@@ -104,7 +104,7 @@ def test_mismatched_inputs_are_refused(tmp_path, cell):
         eb.run(tmp_path, [cell], eb.BootstrapSettings(reps=4, chunk=1, workers=1, nice=0))
     with pytest.raises(RuntimeError, match="block"):
         eb.run(tmp_path, [cell], eb.BootstrapSettings(reps=2, chunk=1, workers=1, nice=0, block=1))
-    other = eb.make_cell("sim_0.05", *_series(seed=8), 0.05)  # same key, other data
+    other = eb.make_cell("sim_0.05", *_series(seed=8), 0.05, robust=True)  # same key, other data
     with pytest.raises(RuntimeError, match="data_sha256"):
         eb.run(tmp_path, [other], eb.BootstrapSettings(reps=2, chunk=1, workers=1, nice=0))
 
@@ -140,6 +140,8 @@ def test_sensitivity_runs_use_their_own_folder(tmp_path):
     main = tmp_path / "esr_bootstrap"
     assert eb.root_for(main, None) == main
     assert eb.root_for(main, 40) == tmp_path / "esr_bootstrap_block40"
+    assert eb.root_for(main, None, robust=True) == tmp_path / "esr_bootstrap_robust"
+    assert eb.root_for(main, 40, robust=True) == tmp_path / "esr_bootstrap_robust_block40"
 
 
 def test_degenerate_start_matches_the_port_and_fails_draws(tmp_path, cell):
@@ -155,7 +157,10 @@ def test_degenerate_start_matches_the_port_and_fails_draws(tmp_path, cell):
     assert eb.degenerate_start(y_bad, x)
     with np.errstate(all="ignore"):
         assert not np.all(_cond_mean_sigma(y_bad, x)[1] > 0)  # the defect being masked
-    s = eb.BootstrapSettings(reps=4, chunk=2, workers=1, nice=0)
+    s = eb.BootstrapSettings(
+        reps=4, chunk=2, workers=1, nice=0, robust_scale=False, allow_legacy_start=True
+    )
+    cell = eb.make_cell(cell.key, *_series(), 0.05)  # legacy (esreg-start) cell
     eb.run(tmp_path, [cell], s)
     plain = eb.summarize(tmp_path, s).iloc[0]
     checked = eb.summarize(tmp_path, s, [cell]).iloc[0]
@@ -201,3 +206,71 @@ def test_dashboard_blanks_quarantined_esr_rows():
     )
     out = esr_with_quarantine(esr, scr)
     assert out.quarantined.tolist() == [True, False]
+
+
+# ---------------------------------------------------------------- robust-start wiring (amendment 9)
+def test_run_refuses_esreg_default_start(tmp_path, cell):
+    legacy = eb.BootstrapSettings(reps=2, chunk=1, workers=1, nice=0, robust_scale=False)
+    with pytest.raises(RuntimeError, match="refusing"):
+        eb.run(tmp_path, [cell], legacy)
+    assert not any(tmp_path.iterdir())  # nothing written
+
+
+def test_robust_run_refuses_non_robust_cells(tmp_path):
+    plain = eb.make_cell("sim_0.05", *_series(), 0.05)
+    with pytest.raises(RuntimeError, match="robust cells"):
+        eb.run(tmp_path, [plain], eb.BootstrapSettings(reps=2, chunk=1, workers=1, nice=0))
+
+
+def test_default_settings_are_robust_and_chunks_record_it(tmp_path, cell):
+    s = eb.BootstrapSettings(reps=2, chunk=2, workers=1, nice=0)
+    assert s.robust_scale and s.version == eb.ROBUST_VERSION
+    eb.run(tmp_path, [cell], s)
+    z = np.load(tmp_path / cell.key / "chunk_0000.npz")
+    assert bool(z["robust"]) and int(z["ls_warm"]) > 0 and int(z["ls_failed"]) == 0
+
+
+def test_guard_fires_if_robust_mode_does_not_engage(monkeypatch, cell):
+    import contextlib
+
+    import alphalab.backtest.es as es_mod
+
+    monkeypatch.setattr(es_mod, "robust_scale", lambda *a, **k: contextlib.nullcontext())
+    idx = eb.chunk_indices(cell.key, 1, 0, 1, len(cell.y), 10)
+    with pytest.raises(RuntimeError, match="did not engage"):
+        eb._draws(cell, eb.BootstrapSettings(), idx, [])
+
+
+def test_legacy_resume_needs_explicit_flag(tmp_path):
+    plain = eb.make_cell("sim_0.05", *_series(), 0.05)
+    s = eb.BootstrapSettings(
+        reps=2, chunk=1, workers=1, nice=0, robust_scale=False, allow_legacy_start=True
+    )
+    assert eb.run(tmp_path, [plain], s)["chunks_done"] == 2
+
+
+def test_audit_counts_silent_degenerate_draws(tmp_path):
+    legacy = eb.BootstrapSettings(
+        reps=6, chunk=3, workers=1, nice=0, robust_scale=False, allow_legacy_start=True, block=5
+    )
+    clean = _series()
+    rng = np.random.default_rng(12)
+    n = 800
+    es = 0.02 * rng.uniform(1, 2, n)  # scale convex in the forecast: esreg start degenerate
+    loss = rng.standard_t(5, n) * 0.004 * np.exp(6 * (es / 0.02 - 2)) + 0.002
+    bad = (loss, 0.7 * es, es)
+    series = {"clean_0.05": (*clean, 0.05), "bad_0.05": (*bad, 0.05)}
+    cells = [eb.make_cell(k, *v[:3], v[3]) for k, v in series.items()]
+    assert all(c is not None for c in cells)
+    with np.errstate(all="ignore"):
+        eb.run(tmp_path, cells, legacy)
+    t = eb.audit_degenerate(tmp_path, series).set_index("cell")
+    assert (t.draws_saved == 6).all()
+    assert t.loc["clean_0.05", "degenerate_either"] == 0
+    assert t.loc["bad_0.05", "full_sample_degenerate"]
+    assert t.loc["bad_0.05", "degenerate_either"] > 0
+    # the defect: degenerate draws were saved as finite numbers, i.e. silently "valid"
+    assert t.loc["bad_0.05", "silent_strict"] + t.loc["bad_0.05", "silent_int"] > 0
+    series["clean_0.05"] = (*_series(seed=9), 0.05)
+    with pytest.raises(RuntimeError, match="hash"):
+        eb.audit_degenerate(tmp_path, series)

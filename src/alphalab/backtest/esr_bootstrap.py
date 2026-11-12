@@ -63,6 +63,10 @@ log = logging.getLogger(__name__)
 
 # Bump when the estimator or covariance changes: chunks made by another version are refused.
 ESTIMATOR_VERSION = "esr-2026-11-10-esreg-vcovA-port-tieband-cbb"
+# Robust location-scale starts (es.robust_scale; Addition 9, amendment 9). EXPLORATORY:
+# added after the lockbox was opened. New runs use it by default; esreg's start is refused
+# unless explicitly resuming the legacy run.
+ROBUST_VERSION = "esr-2026-11-11-robust-ls-warmstart-v1"
 MAX_FAIL_SHARE = 0.05  # esback: more than 5% failed resamples -> no bootstrap p-value
 
 
@@ -76,6 +80,12 @@ class BootstrapSettings:
     max_hours: float | None = None
     min_tail: int = 10
     block: int | None = None  # circular block length; None -> ceil(T^(1/3)); 1 -> iid
+    robust_scale: bool = True  # robust location-scale starts (amendment 9)
+    allow_legacy_start: bool = False  # only to resume/summarise the esreg-start run
+
+    @property
+    def version(self) -> str:
+        return ROBUST_VERSION if self.robust_scale else ESTIMATOR_VERSION
 
     def block_for(self, n: int) -> int:
         b = self.block if self.block is not None else int(np.ceil(n ** (1 / 3)))
@@ -97,6 +107,8 @@ class Cell:
     wald0: float
     t0: float
     data_sha256: str
+    b2: tuple[float, ...] | None = None  # full-sample scale coefficients (robust warm start)
+    robust: bool = False  # full-sample estimates computed in robust mode
 
 
 # ---------------------------------------------------------------- building the cells
@@ -108,22 +120,70 @@ def _normalise(loss, es):
     return -loss / unit, -es / unit
 
 
-def make_cell(key: str, loss, var, es, alpha: float, min_tail: int = 10) -> Cell | None:
-    """Full-sample fit for one series; None if either asymptotic test is unavailable."""
-    res = esr_backtest(loss, var, es, alpha, min_tail=min_tail)
+def full_sample_b2(y: np.ndarray, ehat: np.ndarray) -> np.ndarray | None:
+    """Robust full-sample location-scale scale coefficients (the warm start for every draw);
+    None if no start gives a valid fit. The scale MLE is the same for the strict (y) and
+    intercept (y - ehat) fits, as ehat lies in the regressor span."""
+    from alphalab.backtest.es import ESRFitError, _cond_mean_sigma, robust_scale
+
+    x = np.column_stack([np.ones(len(y)), ehat])
+    with robust_scale(None):
+        try:
+            _, sig = _cond_mean_sigma(y - y.max(), x)
+        except ESRFitError:
+            return None
+    return np.linalg.lstsq(x, sig, rcond=None)[0]
+
+
+def make_cell(
+    key: str, loss, var, es, alpha: float, min_tail: int = 10, robust: bool = False
+) -> Cell | None:
+    """Full-sample fit for one series; None if either test is unavailable. With ``robust``
+    the full-sample estimates and statistics (W0, t0) use the robust location-scale starts,
+    so that they and the bootstrap draws come from the same estimator."""
+    from alphalab.backtest.es import ESRFitError, robust_scale
+
+    res = esr_backtest(loss, var, es, alpha, min_tail=min_tail)  # also validates inputs
+    y, ehat = _normalise(loss, es)
+    x = np.column_stack([np.ones(len(y)), ehat])
+    h = hashlib.sha256()
+    for arr in (np.asarray(loss, float), np.asarray(var, float), np.asarray(es, float)):
+        h.update(np.ascontiguousarray(arr).tobytes())
+    h.update(repr(float(alpha)).encode())
+    if robust:
+        b2 = full_sample_b2(y, ehat)
+        if b2 is None or not np.std(ehat) > 1e-8 * np.mean(np.abs(ehat)):
+            log.warning("%s: skipped (no valid robust full-sample fit)", key)
+            return None
+        try:
+            with robust_scale(b2):
+                g, cov, _ = _strict_fit(y, x, alpha, min_tail)
+                d = g - np.array([0.0, 1.0])
+                wald0 = float(d @ np.linalg.solve(cov, d))
+                g0, se, _, _ = _intercept_fit(y - ehat, x, alpha, min_tail)
+        except (ESRFitError, np.linalg.LinAlgError) as ex:
+            log.warning("%s: skipped (robust full-sample fit: %s)", key, ex)
+            return None
+        return Cell(
+            key,
+            float(alpha),
+            y,
+            ehat,
+            (float(g[0]), float(g[1])),
+            float(g0),
+            wald0,
+            float(g0 / se),
+            h.hexdigest(),
+            tuple(float(v) for v in b2),
+            True,
+        )
     if not (res.strict_status.startswith("ok") and res.int_status.startswith("ok")):
         log.warning(
             "%s: skipped (strict: %s; intercept: %s)", key, res.strict_status, res.int_status
         )
         return None
-    y, ehat = _normalise(loss, es)
-    x = np.column_stack([np.ones(len(y)), ehat])
     g, _, _ = _strict_fit(y, x, alpha, min_tail)
     g0, _, _, _ = _intercept_fit(y - ehat, x, alpha, min_tail)
-    h = hashlib.sha256()
-    for arr in (np.asarray(loss, float), np.asarray(var, float), np.asarray(es, float)):
-        h.update(np.ascontiguousarray(arr).tobytes())
-    h.update(repr(float(alpha)).encode())
     return Cell(
         key,
         float(alpha),
@@ -137,7 +197,45 @@ def make_cell(key: str, loss, var, es, alpha: float, min_tail: int = 10) -> Cell
     )
 
 
-def cells_from_config(cfg, min_tail: int = 10) -> tuple[Path, list[Cell]]:
+def cells_root(cfg) -> Path:
+    """The main bootstrap folder of a risk config (development results run)."""
+    from alphalab.pipeline import _processed_dir, _results_dir
+
+    return _results_dir(cfg, _processed_dir(cfg)) / "esr_bootstrap"
+
+
+def series_from_config(cfg) -> dict:
+    """Cell key -> (loss, var, es, alpha) from the development forecasts, exactly as
+    :func:`cells_from_config` builds them (same data hash), without fitting anything."""
+    from alphalab.backtest.report import align
+    from alphalab.pipeline import _processed_dir, _results_dir
+    from alphalab.risk.engine import attach_outcomes
+
+    proc = _processed_dir(cfg)
+    fc = pd.read_parquet(_results_dir(cfg, proc) / "forecasts.parquet")  # never *_lockbox
+    ret = pd.read_parquet(proc / "portfolio_daily.parquet")["ret"]
+    evs = align(
+        {
+            m: attach_outcomes(f.drop(columns="model"), ret)
+            for m, f in fc.groupby("model", sort=False)
+        }
+    )
+    lock = pd.Timestamp(cfg.risk.lockbox_start)
+    out = {}
+    for name, ev in evs.items():
+        if (ev["target_date"] >= lock).any():
+            raise RuntimeError(f"{name}: development forecasts reach the lockbox ({lock.date()})")
+        for a in cfg.risk.alphas:
+            out[f"{name}_{a:g}"] = (
+                ev["loss_next"].to_numpy(float),
+                ev[f"var_{a:g}"].to_numpy(float),
+                ev[f"es_{a:g}"].to_numpy(float),
+                a,
+            )
+    return out
+
+
+def cells_from_config(cfg, min_tail: int = 10, robust: bool = False) -> tuple[Path, list[Cell]]:
     """Development-sample cells for every model and alpha of a risk config."""
     from alphalab.backtest.report import align
     from alphalab.pipeline import _processed_dir, _results_dir
@@ -163,17 +261,24 @@ def cells_from_config(cfg, min_tail: int = 10) -> tuple[Path, list[Cell]]:
             raise RuntimeError(f"{name}: development forecasts reach the lockbox ({lock.date()})")
         for a in cfg.risk.alphas:
             c = make_cell(
-                f"{name}_{a:g}", ev["loss_next"], ev[f"var_{a:g}"], ev[f"es_{a:g}"], a, min_tail
+                f"{name}_{a:g}",
+                ev["loss_next"],
+                ev[f"var_{a:g}"],
+                ev[f"es_{a:g}"],
+                a,
+                min_tail,
+                robust,
             )
             if c is not None:
                 cells.append(c)
     return out / "esr_bootstrap", cells
 
 
-def root_for(root: Path, block: int | None) -> Path:
+def root_for(root: Path, block: int | None, robust: bool = False) -> Path:
     """Main run (default block) in ``esr_bootstrap``; any explicit block length in its own
     folder, so sensitivity runs can never touch the main run's checkpoints."""
-    return root if block is None else root.with_name(f"{root.name}_block{block}")
+    name = root.name + ("_robust" if robust else "")
+    return root.with_name(name if block is None else f"{name}_block{block}")
 
 
 # ---------------------------------------------------------------- chunks and storage
@@ -201,7 +306,8 @@ def chunk_indices(
 
 def _manifest(cell: Cell, s: BootstrapSettings) -> dict:
     return {
-        "estimator_version": ESTIMATOR_VERSION,
+        "estimator_version": s.version,
+        "robust_scale": s.robust_scale,
         "cell": cell.key,
         "alpha": cell.alpha,
         "n": len(cell.y),
@@ -263,15 +369,58 @@ def _run_chunk(args) -> tuple[str, int, float]:
     d, cell, s, j, lo, hi = args
     t = time.perf_counter()
     idx = chunk_indices(cell.key, s.seed, j, hi - lo, len(cell.y), s.block_for(len(cell.y)))
-    w, tt = esr_bootstrap_draws(
-        cell.y, cell.ehat, cell.alpha, idx, cell.g_hat, cell.g0_hat, s.min_tail
-    )
+    trace: list = []
+    w, tt = _draws(cell, s, idx, trace)
     import io
 
+    starts = {
+        k: sum(1 for x in trace if x.startswith(k))
+        for k in ("warm", "corrected", "random", "failed")
+    }
     buf = io.BytesIO()
-    np.savez(buf, rep_lo=lo, rep_hi=hi, wald_star=w, t_star=tt)
+    np.savez(
+        buf,
+        rep_lo=lo,
+        rep_hi=hi,
+        wald_star=w,
+        t_star=tt,
+        robust=s.robust_scale,
+        **{f"ls_{k}": v for k, v in starts.items()},
+    )
     _atomic_write_bytes(Path(d) / f"chunk_{j:04d}.npz", buf.getvalue())
     return cell.key, j, time.perf_counter() - t
+
+
+def _check_mode(cells: list[Cell], s: BootstrapSettings) -> None:
+    """Refuse esreg's default start for new work, and robust runs on non-robust cells."""
+    if not s.robust_scale and not s.allow_legacy_start:
+        raise RuntimeError(
+            "refusing to run the ESR bootstrap with esreg's default location-scale start "
+            "(degenerate in up to 26% of draws); robust_scale=True is required, or "
+            "allow_legacy_start=True to resume the legacy run only"
+        )
+    if s.robust_scale:
+        bad = [c.key for c in cells if not c.robust or c.b2 is None]
+        if bad:
+            raise RuntimeError(f"robust run needs robust cells (make_cell(robust=True)): {bad}")
+
+
+def _draws(cell: Cell, s: BootstrapSettings, idx: np.ndarray, trace: list):
+    """Bootstrap draws in the mode the settings require; asserts the robust path ran."""
+    from alphalab.backtest.es import robust_scale
+
+    _check_mode([cell], s)
+    if not s.robust_scale:
+        return esr_bootstrap_draws(
+            cell.y, cell.ehat, cell.alpha, idx, cell.g_hat, cell.g0_hat, s.min_tail
+        )
+    with robust_scale(cell.b2, trace):
+        w, t = esr_bootstrap_draws(
+            cell.y, cell.ehat, cell.alpha, idx, cell.g_hat, cell.g0_hat, s.min_tail
+        )
+    if len(idx) and not trace:  # the robust code path records every location-scale fit
+        raise RuntimeError("robust location-scale mode did not engage")
+    return w, t
 
 
 def _init_worker(nice: int) -> None:
@@ -306,7 +455,7 @@ def time_one_resample(cell: Cell, s: BootstrapSettings, k: int = 2) -> float:
     n = len(cell.y)
     idx = chunk_indices(cell.key, s.seed + 1, 0, k, n, s.block_for(n))  # not a real chunk
     t = time.perf_counter()
-    esr_bootstrap_draws(cell.y, cell.ehat, cell.alpha, idx, cell.g_hat, cell.g0_hat, s.min_tail)
+    _draws(cell, s, idx, [])
     return (time.perf_counter() - t) / k
 
 
@@ -331,6 +480,7 @@ def plan(root: Path, cells: list[Cell], s: BootstrapSettings) -> dict:
 
 def run(root: Path, cells: list[Cell], s: BootstrapSettings, log_path: Path | None = None) -> dict:
     """Run or resume all remaining chunks within the settings' limits."""
+    _check_mode(cells, s)
     os.environ.update(
         {
             k: "1"
@@ -504,6 +654,65 @@ def _degenerate_draws(cell: Cell, idx: np.ndarray) -> tuple[np.ndarray, np.ndarr
     return ds, di
 
 
+def _series_hash(loss, var, es, alpha) -> str:
+    h = hashlib.sha256()
+    for arr in (np.asarray(loss, float), np.asarray(var, float), np.asarray(es, float)):
+        h.update(np.ascontiguousarray(arr).tobytes())
+    h.update(repr(float(alpha)).encode())
+    return h.hexdigest()
+
+
+def audit_degenerate(root: Path, series: dict) -> pd.DataFrame:
+    """Saved draws whose fit used esreg's degenerate location-scale start (the pilot's
+    detection, :func:`degenerate_start`), per cell; no refitting. ``series`` maps cell key ->
+    (loss, var, es, alpha), checked against the manifest's data hash. A degenerate draw with
+    a finite saved statistic is a *silent* failure: it would have counted as valid."""
+    rows = []
+    for d in sorted(p for p in Path(root).iterdir() if p.is_dir()):
+        m = json.loads((d / "manifest.json").read_text())
+        files = sorted(d.glob("chunk_*.npz"), key=lambda f: int(f.stem.split("_")[1]))
+        if m["cell"] not in series:
+            raise KeyError(f"no input series for {m['cell']}")
+        loss, var, es, alpha = series[m["cell"]]
+        if _series_hash(loss, var, es, alpha) != m["data_sha256"]:
+            raise RuntimeError(f"{d}: input data differ from the run's (hash mismatch)")
+        y, eh = _normalise(loss, es)
+        n = len(y)
+        x = np.column_stack([np.ones(n), eh])
+        z = y - eh
+        bounds = chunk_bounds(m["reps"], m["chunk"])
+        ds_all, di_all, w_all, t_all = [], [], [], []
+        for f in files:
+            j = int(f.stem.split("_")[1])
+            lo, hi = bounds[j]
+            idx = chunk_indices(m["cell"], m["seed"], j, hi - lo, n, m["block"])
+            cell = Cell(m["cell"], alpha, y, eh, (0.0, 0.0), 0.0, 0.0, 0.0, "")
+            ds, di = _degenerate_draws(cell, idx)
+            z_ = np.load(f)
+            ds_all.append(ds)
+            di_all.append(di)
+            w_all.append(z_["wald_star"])
+            t_all.append(z_["t_star"])
+        cat = (lambda v: np.concatenate(v)) if files else (lambda v: np.array([], float))
+        ds, di, w, t = cat(ds_all).astype(bool), cat(di_all).astype(bool), cat(w_all), cat(t_all)
+        rows.append(
+            {
+                "cell": m["cell"],
+                "estimator_version": m["estimator_version"],
+                "draws_saved": len(w),
+                "full_sample_degenerate": degenerate_start(y - y.max(), x)
+                or degenerate_start(z - z.max(), x),
+                "degenerate_strict": int(ds.sum()),
+                "degenerate_int": int(di.sum()),
+                "degenerate_either": int((ds | di).sum()),
+                "silent_strict": int((ds & np.isfinite(w)).sum()),
+                "silent_int": int((di & np.isfinite(t)).sum()),
+                "share_either": float((ds | di).mean()) if len(w) else float("nan"),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 # Models whose ESR results are unavailable until a corrected, validated estimator exists.
 QUARANTINE = {
     "linqr_l1": (
@@ -556,7 +765,7 @@ def summarize(root: Path, s: BootstrapSettings, cells: list[Cell] | None = None)
     for d in sorted(p for p in root.iterdir() if p.is_dir()) if root.exists() else []:
         m = json.loads((d / "manifest.json").read_text())
         if (
-            m["estimator_version"] != ESTIMATOR_VERSION
+            m["estimator_version"] != s.version
             or m["reps"] != s.reps
             or m.get("block") != s.block_for(m["n"])
         ):
@@ -580,7 +789,7 @@ def summarize(root: Path, s: BootstrapSettings, cells: list[Cell] | None = None)
         row["quarantined"] = quarantined
         cell = by_key.get(m["cell"])
         full_bad = {"strict": False, "int": False}
-        if cell is not None:
+        if cell is not None and not s.robust_scale:  # legacy run: mask esreg's degenerate start
             if cell.data_sha256 != m["data_sha256"]:
                 raise RuntimeError(f"{d}: cell data differ from the run's (hash mismatch)")
             js = [int(f.stem.split("_")[1]) for f in files]
@@ -627,7 +836,9 @@ __all__ = [
     "Cell",
     "ESRFitError",
     "cells_from_config",
+    "audit_degenerate",
     "degenerate_start",
+    "full_sample_b2",
     "screen",
     "chunk_bounds",
     "chunk_indices",

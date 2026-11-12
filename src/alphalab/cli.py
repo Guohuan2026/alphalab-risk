@@ -71,6 +71,12 @@ def main(argv: list[str] | None = None) -> int:
             sp.add_argument(
                 "--only", default=None, help="regex on cell keys, e.g. '_0.025$' (sensitivity runs)"
             )
+            sp.add_argument(
+                "--legacy-esreg-start",
+                action="store_true",
+                help="esreg's location-scale start (degenerate in some draws): ONLY to resume or "
+                "summarise the legacy run; new runs use robust starts (Addition 9, amendment 9)",
+            )
             mode = sp.add_mutually_exclusive_group()
             mode.add_argument("--plan", action="store_true", help="estimate only; no work")
             mode.add_argument("--summarize", action="store_true", help="write p-values")
@@ -80,6 +86,11 @@ def main(argv: list[str] | None = None) -> int:
             mode.add_argument(
                 "--screen", action="store_true", help="degenerate-start check and quarantine"
             )
+            mode.add_argument(
+                "--audit-degenerate",
+                action="store_true",
+                help="count saved draws that used esreg's degenerate start (no refitting)",
+            )
         if name == "esr-sim":
             from alphalab.backtest.esr_sim import SimSettings as _SS
 
@@ -87,6 +98,12 @@ def main(argv: list[str] | None = None) -> int:
             sp.add_argument("--n", type=int, default=d.n, help="sample length")
             sp.add_argument("--reps", type=int, default=d.reps, help="Monte Carlo replications")
             sp.add_argument("--workers", type=int, default=d.workers, help="processes")
+            sp.add_argument(
+                "--cov",
+                default=d.cov,
+                choices=["scl_sp", "ind_nomis", "ind_mis"],
+                help="ESR covariance variant (amendment 10; default = pre-registered scl_sp)",
+            )
             sp.add_argument("--summarize", action="store_true", help="write rejection rates")
         if name in ("forecast", "backtest"):
             sp.add_argument(
@@ -158,9 +175,24 @@ def main(argv: list[str] | None = None) -> int:
             nice=args.nice,
             max_hours=args.max_hours,
             block=args.block,
+            robust_scale=not args.legacy_esreg_start,
+            allow_legacy_start=args.legacy_esreg_start,
         )
-        root, cells = eb.cells_from_config(cfg)
-        root = eb.root_for(root, args.block)
+        if args.audit_degenerate:  # raw inputs only: no fitting, so it is quick
+            t = eb.audit_degenerate(
+                eb.root_for(eb.cells_root(cfg), args.block, robust=s.robust_scale),
+                eb.series_from_config(cfg),
+            )
+            out = (
+                eb.cells_root(cfg).parent
+                / f"esr_degenerate_audit_{'robust' if s.robust_scale else 'legacy'}.csv"
+            )
+            t.to_csv(out, index=False)
+            print(t.to_string(index=False))
+            print(f"wrote {out}")
+            return 0
+        root, cells = eb.cells_from_config(cfg, robust=s.robust_scale)
+        root = eb.root_for(root, args.block, robust=s.robust_scale)
         if args.only:
             import re
 
@@ -196,8 +228,9 @@ def main(argv: list[str] | None = None) -> int:
 
         from alphalab.backtest import esr_sim as es_
 
-        s = es_.SimSettings(n=args.n, reps=args.reps, workers=args.workers)
-        root = Path(cfg.data_dir) / "results" / "esr_sim" / f"n{s.n}_reps{s.reps}_seed{s.seed}"
+        s = es_.SimSettings(n=args.n, reps=args.reps, workers=args.workers, cov=args.cov)
+        tag = "" if s.cov == "scl_sp" else f"_cov-{s.cov}"  # separate folder per variant
+        root = Path(cfg.data_dir) / "results" / "esr_sim" / f"n{s.n}_reps{s.reps}_seed{s.seed}{tag}"
         if args.summarize:
             t = es_.summarize(root, s)
             t.to_csv(root / "rejection_rates.csv", index=False)
