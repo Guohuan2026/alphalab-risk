@@ -127,3 +127,10 @@ the other backtests calibrated for dependence separately. **Action:** recorded a
 recommendation to the owner in RUN_SUMMARY.md; not implemented (design change → owner).
 Run stopped at 19:42 EST, before the 20:16 hard stop: no remaining step is permitted without
 the owner (design change, real-data launch, push, merge).
+**Codex full reply (m-9710261fed41):** confirms NO-GO (Monte Carlo uncertainty does not alter
+the pre-specified decision; V2's complete availability resolves its earlier selection
+concern). Recommendation unchanged: retire ESR p-values and GO decisions from inferential use,
+keep ESR estimates/statistics descriptively; other backtests need their own dependence-robust
+calibration. Caveats: HAC studentisation, longer blocks or score bootstraps would each be a new
+research programme needing fresh validation (these results do not show which would work), and
+HAC plus a block bootstrap must not be described as automatically pivotal.

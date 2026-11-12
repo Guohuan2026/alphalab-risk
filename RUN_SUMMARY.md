@@ -79,6 +79,9 @@ All real-data cells: ESR p-values descriptive only. Lasso QR stays quarantined.
 - Recommended next milestone (for the owner to decide; not started): **retire ESR inference to
   descriptive status by a new amendment**, keep the descriptive results, and check the other
   backtests (Acerbi–Székely Z2, McNeil–Frey) for dependence-robust calibration separately.
+- Codex's caveat: alternatives (HAC studentisation, longer blocks, score bootstraps) would each
+  be a new research programme with fresh validation; none is known to work, and HAC plus a
+  block bootstrap is not automatically pivotal.
 
 ## Real-data cost (for reference only — not applicable after NO-GO)
 
