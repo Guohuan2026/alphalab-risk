@@ -721,3 +721,27 @@ hence those cells' ESR Wald, t and p-values in the entries above, are not valid.
 withdrawn (point estimates γ̂ are unaffected). This also explains most of the lasso-QR gap to
 esreg reported earlier. All other cells are unaffected in the full sample. No bootstrap
 p-value has been summarised yet (Addition 9, amendments 6–7 set the checks first).
+
+---
+
+## 2026-11-11 — ESR validation closed: inference retired (exploratory, development only)
+
+Three attempts to give the ESR backtest valid p-values under serial dependence, each with its
+gate written first:
+1. **Robust location-scale starts** (amendment 9): pilot failure rate 0 of 2,600, but the
+   start-invariance check failed in the dependence designs (24 of 285 samples). Cause: the
+   auxiliary scale likelihood is unbounded, so fits can end at a zero-sd boundary. Audit:
+   0 of 21,879 saved legacy draws affected outside lasso QR; 2,479 lasso draws were
+   degenerate and had been saved as finite numbers (never counted; quarantined).
+2. **Pre-registered scl_sp bootstrap:** unusable (22–32% boundary fits in designs B1/B2).
+3. **esreg independence covariance** (amendment 10, primary variant misspec = FALSE; checked
+   against R esreg to ≤ 1e-13 apart from the documented tie policy): no numerical failures,
+   but at block 20 the 5% rejection rates were strict 5.6% / 11.7% / 25.4% and intercept
+   3.5% / 8.5% / 16.6% in designs A / B1 / B2, against a pre-specified limit of 6.4%:
+   **NO-GO**. Longer blocks reduce, but do not remove, the over-rejection.
+
+**Decision (amendment 11, owner-approved):** ESR p-values and ESR-based GO/NO-GO are retired;
+γ̂, Wald and t remain descriptive diagnostics (the dashboard now shows these, not p-values).
+No ESR result above is held-out evidence. The other backtests were re-examined rather than
+presumed valid: `docs/EVIDENCE_STATUS.md` (coverage and DQ supported; DM, MCS, H3 HAC,
+McNeil–Frey and Z2 p-values provisional pending a calibration check; estimates unaffected).

@@ -727,3 +727,18 @@ Format: date · section · change · reason · made before/after seeing affected
      only partly accounts for the serial dependence. Asymptotic p-values: NO-GO (strict A
      11.0%, B1 38.3%, B2 58.6%). **V1: unusable** (full-sample fit failures A 98, B1 409, B2
      437 of 1,000). Per (g), work on the estimator stopped; ESR p-values remain descriptive.
+     **Amendment 11 (2026-11-11, owner-approved; EXPLORATORY, post-lockbox). ESR inference
+     retired.** Following amendment 10(k) and Codex's recommendation, the owner approved
+     retiring the ESR test from inferential use: (a) no ESR p-value (asymptotic, scl_sp
+     bootstrap or ind bootstrap) and no ESR-based GO/NO-GO is used as evidence anywhere in
+     the project; (b) ESR estimates (γ̂) and statistics (Wald, t) are kept strictly as
+     descriptive diagnostics, labelled as such in tables, the dashboard and the report; (c)
+     the failed validation is kept in full (amendments 5–10, simulation outputs, decision
+     log) as a documented negative result; (d) no further ESR methodological programme is
+     started at this stage (HAC studentisation, longer blocks or score bootstraps would each
+     need a new pre-specified programme and fresh validation); (e) the other backtests are
+     not presumed valid because ESR was retired: their status is classified test by test in
+     `docs/EVIDENCE_STATUS.md` (supported inference, descriptive, inference pending
+     dependence-robust calibration, retired). The P1 lasso QR ESR quarantine continues
+     (degenerate covariance: even its descriptive ESR statistics are blank); it concerns
+     ESR only.

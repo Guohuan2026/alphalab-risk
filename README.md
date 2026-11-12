@@ -101,5 +101,6 @@ provider.fetch()  ──►  data/raw/<provider>/<snapshot_id>/        (immutabl
 
 ## Read next
 - [docs/METHODOLOGY.md](docs/METHODOLOGY.md) — return math, adjusted prices, look-ahead rules
+- [docs/EVIDENCE_STATUS.md](docs/EVIDENCE_STATUS.md) — which results are supported inference, descriptive, provisional or retired
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — what this prototype cannot tell you
 - [docs/ROADMAP.md](docs/ROADMAP.md) — milestones through factors, backtesting and CRSP

@@ -124,3 +124,15 @@ they can distort conclusions.
       own location-scale optimisation is run to convergence. Unmodified esreg stops that
       optimisation early, which alone changes its Wald by up to ~60% on some series; our
       numbers therefore differ from a plain `esback::esr_backtest` call on those series.
+18. **Inference status of the backtests after the ESR failure (2026-11-11).** ESR inference
+    is retired (Addition 9, amendment 11): its bootstrap over-rejected under serially
+    dependent tail hits (block 20: up to 25% at nominal 5%). That failure is specific to
+    ESR, but it is a warning for every test used on persistent daily risk data, so each was
+    re-examined (`docs/EVIDENCE_STATUS.md`). Coverage (Christoffersen IND/CC) and DQ test
+    nulls under which dependence is the alternative, so they remain supported, with
+    few-hits caveats at 1% (DQ is known to be over-sized at low α). Diebold–Mariano, the
+    Model Confidence Set and the H3 HAC regression are asymptotically dependence-robust but
+    their finite-sample size under persistent, heavy-tailed FZ0 differentials is unchecked;
+    their p-values and MCS memberships are provisional. McNeil–Frey (few hits) and Z2
+    (assumed tail shape) are also unchecked. Means, ranks, hit rates and other estimates are
+    unaffected.

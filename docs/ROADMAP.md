@@ -49,6 +49,27 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
 13. ✅ Streamlit dashboard (`make dashboard`; reads saved results; no model fitting in the app).
 14. ✅ Research report draft v1 (`docs/REPORT.md`) and clean-clone reproducibility run (bit-identical).
 
+15. ✅ ESR validation closed (2026-11-11, Addition 9, amendments 9–11): robust starts and the
+    independence-covariance bootstrap both failed their pre-specified gates; ESR inference
+    retired, statistics kept as diagnostics. Evidence classified in `docs/EVIDENCE_STATUS.md`.
+
+## Next milestones (recommended 2026-11-11, in order)
+16. **Calibration check for the provisional tests** (simulation only; no new data, no lockbox;
+    acceptance rules written first). Size of DM (with Harvey–Leybourne–Newbold correction
+    and fixed-b sensitivity), MCS (blocks 10/20/40) and the H3 HAC regression under
+    persistent, heavy-tailed loss differentials calibrated to the real FZ0 series; size of
+    McNeil–Frey and Z2 at the real numbers of hits and under a wrong tail shape; Monte Carlo
+    p-values for 1% coverage/DQ. Outcome: each headline significance claim either moves to
+    "supported" or is restated as descriptive.
+17. **Research report v2** (`docs/REPORT.md`): every claim tagged by evidence category;
+    figures generated from saved results; a methods appendix on the ESR negative result
+    (esreg port, the degenerate-start defect, the size failure under dependence); limitations
+    and reproducibility sections; supervisor-ready PDF.
+18. **Portfolio release:** README rewritten for a recruiter reader (question, answer, one
+    figure, architecture, how to reproduce, CI badge); dashboard "evidence status" labels
+    next to every p-value; clean-clone run; tagged release `v1.0`; owner decides on
+    merging to `main` and on making the repository public.
+
 ## Later / partner-dependent
 - CRSP or partner P&L via the provider interface; multivariate models (DCC-GARCH, copulas);
   CAViaR; intraday realized volatility.

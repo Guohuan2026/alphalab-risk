@@ -5,6 +5,14 @@ Guohuan Yu, MSc Finance (supervised-project pathway), HEC Montréal
 Code, data provenance and full history: `github.com/Guohuan2026/alphalab-risk` (private),
 branch `alphalab-risk`. Every number below is taken from `docs/RESULTS_LOG.md`.
 
+> **Evidence status (2026-11-11).** How strongly each claim may be read is classified in
+> `docs/EVIDENCE_STATUS.md`. In short: calibration results (Christoffersen CC/IND, DQ) are
+> supported inference; means, ranks and hit rates are descriptive facts; Diebold–Mariano,
+> MCS and the stress-dummy regression p-values below are **provisional** until their size is
+> checked under persistent, heavy-tailed loss differentials. The ESR backtest (added later,
+> exploratory) failed validation and is retired from inference. A revised draft will reflect
+> this throughout.
+
 ---
 
 ## Abstract

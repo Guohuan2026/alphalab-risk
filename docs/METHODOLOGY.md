@@ -461,3 +461,11 @@ Nelder–Mead search cannot lower the joint FZ0 loss from our solution; three fi
 with esreg (5% tolerance); unit invariance and stability under last-bit perturbations;
 degenerate samples. Simulated size and power are in Addition 9. Output: `backtest_esr.csv`.
 Development samples only.
+
+**Status (2026-11-11): retired from inference (Addition 9, amendment 11).** The asymptotic
+p-values are over-sized under the serial dependence present in the real scores; the
+pre-registered block bootstrap is unusable (zero-sd boundary fits of the location-scale
+model) and the amended one (esreg's independence covariance, misspec = FALSE) failed the
+pre-specified size check (amendment 10(k)). The estimator, the esreg port and all validation
+code are kept; γ̂, Wald and t are reported as descriptive diagnostics only. How every other
+test stands: `docs/EVIDENCE_STATUS.md`.

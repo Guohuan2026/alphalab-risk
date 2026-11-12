@@ -298,11 +298,13 @@ with tabs[2]:
             if esr is not None:
                 esr = D.esr_with_quarantine(esr, D.table(run, "backtest_esr_screen", lockbox))
                 e = e.merge(
-                    esr[esr.alpha == alpha][["model", "strict_p", "int_p"]],
+                    # Addition 9, amendment 11: ESR p-values are retired from inference;
+                    # only the descriptive statistics are shown (the tables keep the p columns)
+                    esr[esr.alpha == alpha][["model", "strict_g1", "strict_wald", "int_t"]],
                     on="model",
                     how="left",
                 )
-                ecols += ["strict_p", "int_p"]
+                ecols += ["strict_g1", "strict_wald", "int_t"]
             e = e.assign(Model=e.model.map(D.label))[ecols]
             st.dataframe(
                 e.rename(
@@ -313,8 +315,9 @@ with tabs[2]:
                         "p_std": "p (standardised)",
                         "z2": "Z2",
                         "p_z2": "Z2 p",
-                        "strict_p": "ESR strict p",
-                        "int_p": "ESR intercept p",
+                        "strict_g1": "ESR slope",
+                        "strict_wald": "ESR Wald",
+                        "int_t": "ESR intercept t",
                     }
                 ).style.format(
                     {
@@ -323,8 +326,9 @@ with tabs[2]:
                         "p (standardised)": fmt_p,
                         "Z2": "{:.3f}",
                         "Z2 p": fmt_p,
-                        "ESR strict p": fmt_p,
-                        "ESR intercept p": fmt_p,
+                        "ESR slope": "{:.2f}",
+                        "ESR Wald": "{:.1f}",
+                        "ESR intercept t": "{:.2f}",
                     }
                 ),
                 hide_index=True,
@@ -341,17 +345,18 @@ with tabs[2]:
             )
             if esr is not None:
                 st.caption(
-                    "ESR (exploratory, development only): intercept p < 0.05 = ES understated "
-                    "after conditioning on the forecast (the ESR result; conservative). Strict "
-                    "ESR (secondary) also tests the slope on the forecast. These p-values are "
-                    "asymptotic and ignore serial correlation in the scores, which is present "
-                    "in most cells, so they are descriptive and too small (LIMITATIONS #17)."
+                    "ESR (descriptive diagnostics only, development samples): slope 1 and "
+                    "intercept t near 0 mean the forecast ES matches the realised tail; a "
+                    "negative intercept t points to ES understated. No p-values are shown: ESR "
+                    "inference was retired after its bootstrap failed the pre-specified size "
+                    "check under serial dependence (Addition 9, amendment 11; "
+                    "docs/EVIDENCE_STATUS.md)."
                 )
                 q = esr.loc[esr.quarantined, "model"].map(D.label).unique()
                 if len(q):
                     st.caption(
-                        "ESR unavailable (quarantined until a corrected estimator is "
-                        f"validated): {', '.join(q)}."
+                        "ESR statistics unavailable (degenerate covariance fit; ESR quarantine "
+                        f"only, other results unaffected): {', '.join(q)}."
                     )
         if dm is not None:
             st.subheader("Diebold–Mariano on FZ0 (row vs column; negative = row better)")
