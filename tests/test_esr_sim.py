@@ -1,0 +1,141 @@
+"""ESR bootstrap size simulation (Addition 9): exact forecasts, warp-speed p, resume."""
+
+from __future__ import annotations
+
+import json
+
+import numpy as np
+import pytest
+
+from alphalab.backtest import esr_sim as es_
+from alphalab.backtest.es import _t_tail
+
+
+def test_exact_forecasts_match_closed_form_and_monte_carlo():
+    v, e = _t_tail(0.025, 5.0)  # loss-space VaR/ES of the (unit-scale) t5
+    q, es = es_.product_var_es(0.025, 0.0)
+    assert q == pytest.approx(-v * es_.T_SCALE, rel=1e-10)
+    assert es == pytest.approx(-e * es_.T_SCALE, rel=1e-10)
+    rng = np.random.default_rng(1)
+    s = 0.6
+    x = np.exp(-(s**2) / 2 + s * rng.standard_normal(2_000_000))
+    x = x * es_.T_SCALE * rng.standard_t(5, 2_000_000)
+    q, es = es_.product_var_es(0.025, s)
+    qm = np.quantile(x, 0.025)
+    assert q == pytest.approx(qm, rel=0.01) and es == pytest.approx(x[x <= qm].mean(), rel=0.02)
+
+
+def test_simulated_forecasts_are_calibrated_on_average():
+    d = es_.Design("B", 0.8, phi_eta=0.95)
+    hits = [
+        np.mean(np.greater(*es_.simulate(d, 4000, np.random.default_rng(k))[:2])) for k in range(10)
+    ]
+    assert np.mean(hits) == pytest.approx(0.025, abs=0.003)
+
+
+def test_warp_p_values():
+    star = np.array([0.0, 1.0, 2.0, 3.0])
+    assert es_.warp_p(np.array([2.0]), star, upper=True)[0] == 0.5  # share >= 2
+    assert es_.warp_p(np.array([1.0]), star, upper=False)[0] == 0.5  # share <= 1
+    assert es_.warp_p(np.array([9.0]), np.append(star, np.nan), upper=True)[0] == 0.0
+    assert np.isnan(es_.warp_p(np.array([1.0]), np.array([np.nan]), upper=True)[0])  # empty pool
+    assert np.isnan(es_.warp_p(np.array([np.nan]), star, upper=True)[0])
+    rng = np.random.default_rng(2)  # same law -> p uniform -> 5% rejections
+    p = es_.warp_p(rng.chisquare(2, 4000), rng.chisquare(2, 4000), upper=True)
+    assert np.mean(p < 0.05) == pytest.approx(0.05, abs=0.012)
+
+
+def test_run_is_resumable_and_reproducible(tmp_path):
+    s = es_.SimSettings(
+        designs=(es_.Design("A", 0.0),), n=600, reps=4, blocks=(1, 10), batch=2, workers=1, nice=0
+    )
+    assert es_.run(tmp_path, s) == {"batches_done": 2, "batches_total": 2}
+    f = tmp_path / "A" / "batch_0001.json"
+    before = json.loads(f.read_text())
+    f.unlink()
+    assert es_.run(tmp_path, s)["batches_total"] == 1
+    assert json.loads(f.read_text()) == before
+    t = es_.summarize(tmp_path, s)
+    assert set(t.method) == {"asymptotic", "iid bootstrap", "block bootstrap"}
+    assert (t.degenerate_full_reps == 0).all()  # well-behaved design: start never degenerate
+    fl = es_.degenerate_flags(s, s.designs[0], 0)
+    assert set(fl) == {
+        "rep",
+        "full_strict",
+        "full_int",
+        "draw_strict_b1",
+        "draw_int_b1",
+        "draw_strict_b10",
+        "draw_int_b10",
+    }
+    with pytest.raises(RuntimeError, match="other settings"):
+        es_.run(tmp_path, es_.SimSettings(designs=s.designs, n=600, reps=6, batch=2, workers=1))
+
+
+def test_warp_rejection_sd_exceeds_binomial_and_failures_block_use(tmp_path):
+    rng = np.random.default_rng(3)
+    rate, sd = es_.warp_rejection(rng.chisquare(2, 1000), rng.chisquare(2, 1000), True, 0.05)
+    assert rate == pytest.approx(0.05, abs=0.02)
+    assert sd >= 0.8 * np.sqrt(0.05 * 0.95 / 1000)  # includes critical-value noise
+    assert all(np.isnan(es_.warp_rejection(np.array([1.0]), np.array([np.nan]), True, 0.05)))
+    s = es_.SimSettings(
+        designs=(es_.Design("A", 0.0),), n=600, reps=2, blocks=(1,), batch=2, workers=1, nice=0
+    )
+    es_.run(tmp_path, s)
+    f = tmp_path / "A" / "batch_0000.json"
+    rows = json.loads(f.read_text())
+    for r in rows:
+        r["wstar_b1"] = None  # every bootstrap draw failed
+    f.write_text(json.dumps(rows))
+    row = es_.summarize(tmp_path, s).query("method == 'iid bootstrap'").iloc[0]
+    assert not row.usable and np.isnan(row.strict_rej)
+
+
+def test_summarize_requires_complete_run_and_full_sample_availability(tmp_path, monkeypatch):
+    """Amendment 10(j): survivors-only rates are never 'usable'."""
+    import json
+
+    import numpy as np
+
+    from alphalab.backtest import esr_sim as sim
+
+    s = sim.SimSettings(
+        cov="ind_nomis", reps=20, blocks=(20,), designs=(sim.SimSettings().designs[0],)
+    )
+    d = s.designs[0]
+    (tmp_path / d.name).mkdir()
+    rng = np.random.default_rng(0)
+
+    def rows(n_fail):
+        out = []
+        for r in range(s.reps):
+            if r < n_fail:
+                out.append({"rep": r, "ok": False})
+            else:
+                out.append(
+                    {
+                        "rep": r,
+                        "ok": True,
+                        "wald0": float(rng.chisquare(2)),
+                        "t0": float(rng.normal()),
+                        "p_strict_asym": 0.5,
+                        "p_int_asym": 0.5,
+                        "wstar_b20": float(rng.chisquare(2)),
+                        "tstar_b20": float(rng.normal()),
+                    }
+                )
+        return out
+
+    path = tmp_path / d.name / "batch_0000.json"
+    path.write_text(json.dumps(rows(0)))
+    t = sim.summarize(tmp_path, s).set_index("method")
+    assert bool(t.loc["block bootstrap", "usable"]) and t.loc["block bootstrap", "strict_wilson95"]
+    path.write_text(json.dumps(rows(3)))  # 15% failed full-sample fits: survivors only
+    t = sim.summarize(tmp_path, s).set_index("method")
+    assert (
+        not bool(t.loc["block bootstrap", "usable"]) and t.loc["block bootstrap", "full_fail"] == 3
+    )
+    path.write_text(json.dumps(rows(0)[:10]))  # unfinished run
+    assert not bool(sim.summarize(tmp_path, s).set_index("method").loc["block bootstrap", "usable"])
+    path.write_text(json.dumps(rows(20)))  # everything failed: unavailable, no crash
+    assert sim.summarize(tmp_path, s).method.tolist() == ["unavailable"]

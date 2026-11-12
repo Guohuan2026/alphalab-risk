@@ -88,3 +88,23 @@ def check_schema(df: pd.DataFrame) -> None:
     if df.duplicated(KEY).any():
         n = int(df.duplicated(KEY).sum())
         raise SchemaError(f"{n} duplicate (security_id, date) rows")
+
+
+# ---------- series schema (non-price data: index levels, macro/market series) ----------
+SERIES_COLUMNS = ["date", "security_id", "value"]
+"""Long format for feature inputs such as VIX or FRED spreads. ``security_id`` holds the
+series name (e.g. ``"^VIX"``, ``"BAA10Y"``). Values may be negative (spreads), so the price
+rules (positive close, dividends, splits) do not apply."""
+
+
+def check_series_schema(df: pd.DataFrame) -> None:
+    """Raise SchemaError if ``df`` is not a valid long series frame."""
+    missing = [c for c in SERIES_COLUMNS if c not in df.columns]
+    if missing:
+        raise SchemaError(f"missing required series columns: {missing}")
+    if not pd.api.types.is_datetime64_any_dtype(df["date"]) or df["date"].dt.tz is not None:
+        raise SchemaError("'date' must be a tz-naive datetime column")
+    if not pd.api.types.is_float_dtype(df["value"]):
+        raise SchemaError(f"'value' must be float, got {df['value'].dtype}")
+    if df.duplicated(KEY).any():
+        raise SchemaError(f"{int(df.duplicated(KEY).sum())} duplicate (security_id, date) rows")

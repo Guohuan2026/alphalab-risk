@@ -1,11 +1,15 @@
-# Known limitations (Milestones 1–2)
+# Known limitations
 
-Ordered roughly by how much they can distort research conclusions.
+Research-design limitations of the risk study (statistical power, univariate portfolio
+approach, tuning budget, ...) are listed in [RESEARCH_DESIGN.md §9](RESEARCH_DESIGN.md).
+This file lists limitations of the **code and data as built**, ordered roughly by how much
+they can distort conclusions.
 
-1. **Survivorship bias (severe).** The universe is a hand-picked list of companies that
-   exist and are large *today*. Yahoo has little data on delisted firms. Any backtest on
-   it overstates returns and understates risk. Fix: CRSP with point-in-time universe
-   membership and delisting returns (`DLRET`).
+1. **Survivorship bias.** Severe for the archived stock-selection universe
+   (`configs/yahoo_us_core.yaml`, a hand-picked list of today's large caps). Much smaller
+   for the risk study, which uses indices and ETFs that did not delist. It remains in the
+   sense that we study markets that *survived and grew* (US, Canada). A full fix for
+   stock-level work is CRSP with point-in-time membership and delisting returns (`DLRET`).
 2. **Unofficial data source.** `yfinance` scrapes an undocumented Yahoo endpoint. It can
    rate-limit, change format, or return errors without notice. Treat it as a teaching
    and prototyping source, never as ground truth.
@@ -35,3 +39,110 @@ Ordered roughly by how much they can distort research conclusions.
 10. **Live path depends on the network.** The Yahoo download path is covered by an
     offline normalisation test; the live test (`pytest -m network`) passed on the
     owner's Mac on 2026-11-06 but can break whenever Yahoo changes its API (see #2).
+11. **SPY vs S&P 500 TR index, before 2009 (open).** Our SPY total return tracks `^SP500TR`
+    to within 0.13%/yr over 1993–2026 (about the expense ratio), and daily correlation is
+    about 0.999 from 2009 on. But in 1993–2008 daily correlation is only 0.94–0.98, with up
+    to 59 days a year differing by more than 0.5%. Cause not yet established (closing-time
+    differences or stale index prints are candidates). Because daily risk forecasts are
+    sensitive to this, P1 models will also be run on `^SP500TR` as a robustness check.
+12. **XIU.TO year-end reinvested distributions (resolved 2026-11-06, Clarification 6: 3 dates
+    corrected at build).** Some December
+    "dividends" (e.g. $0.46 on 2000-12-27, 3.5% of price) come with no price drop. That is
+    typical of reinvested (non-cash) distributions with unit consolidation. Treating them
+    as cash creates fake gains (+3.8% that day). Must be resolved, for example by
+    cross-checking against Yahoo's adjusted close or iShares distribution records, before
+    P3 results are used. Related: Yahoo shows XIU trading on 2001-09-11 (a partial TSX
+    session before the halt), which `exchange_calendars` marks closed; the row is kept and
+    flagged as `non_session_date`.
+13. **Feature timing and proxies.** FRED data are the *latest vintage*. That is harmless for
+    market yields, which are not revised, but not point-in-time for macro series (those
+    would need ALFRED vintages). VIX settles at 4:15 pm ET, after the equity close: fine
+    for an end-of-day forecast, not for one produced at 4:00 pm. Range-based variance
+    ignores the overnight gap, so it understates total variance. P3 (Canada) uses US
+    stress indicators (VIX, US spreads) as global proxies.
+14. **Quantile forest implementation detail and library dependence (found 2026-11-07 by the
+    clean-clone check).** All QRF results used `quantile-forest` 1.4.2 with its defaults:
+    `max_samples_leaf=1` (each leaf keeps ONE training value, so a forecast distribution
+    has ~300 values, one per tree) and linear quantile interpolation. That is coarser than
+    Meinshausen's original QRF, which keeps every leaf value, and may contribute to the QRF's
+    poor deep-tail results; the model was not changed after the fact (results are frozen).
+    Version 1.5.0 gives materially different quantiles even with these settings pinned
+    (about 20–40% at the 5% level in a test case), so QRF results reproduce only with the
+    locked versions in `requirements-lock.txt`, which the setup script installs.
+    Even with locked versions, QRF output is not bit-identical across machines: a small test
+    forest gave a different FZ0 on a GitHub Linux runner than on the Mac (2026-11-08), while
+    HS on the same data matched exactly. Tree splits are sensitive to last-bit floating-point
+    differences (likely CPU-specific numerical kernels; not verified). The bit-identical
+    reproduction claim therefore holds on the original Mac setup, not across platforms.
+
+15. **Late supplementary tests (DQ and Acerbi–Szekely Z2).** Both were pre-registered but
+    implemented after the lockbox was opened (2026-11-07 and 2026-11-08), so they are
+    reported for the development samples only. Z2's p-value assumes a Student-t tail shape
+    matched to each model's median ES/VaR ratio, a zero location, and a shape that does not
+    change over time; it is an approximation to simulating from each model's own predictive
+    distribution, which is not stored.
+
+16. **Ten-day results are descriptive and use one scaling rule (Clarification 8).** The
+    10-day table scales 1-day forecasts by √10 rather than modelling 10-day losses directly
+    (no multi-step GARCH simulation, no ML trained on 10-day targets), so it measures
+    whether √10 scaling holds for each model, not the best achievable 10-day forecast.
+    Only 4–7 breaches are expected at 1% (414–653 non-overlapping windows), so no tests are
+    run. Development samples only.
+
+17. **ESR backtest: added late; asymptotic p-values; one fragile series (Addition 9).** The
+    ESR test was not pre-registered; it was added on 2026-11-10, after the lockbox was
+    opened, so it is exploratory and run on development samples only.
+    - *Serial dependence invalidates the asymptotic p-values.* The ESR covariance (esreg's,
+      like the paper's) assumes serially uncorrelated scores. On our series they are
+      autocorrelated in most cells (Ljung–Box rejects at 1% in 81–98% of 132 cells;
+      long-run / iid variance of the ES score median 1.9, up to 4.2; smallest for FHS-GJR
+      and GJR-t, 1.1). The asymptotic p-values are therefore too small, by an amount that
+      differs by model, and are treated as descriptive. The autocorrelation itself is a
+      sign of misspecification, so models with it are unlikely to be well calibrated anyway.
+    - *Size in simulation:* with correct forecasts (scores then have no autocorrelation)
+      the strict test rejected 2.5–7.3% at 5% and the one-sided intercept test 0–3%
+      (conservative: not rejecting is weak evidence). Two data-generating processes only.
+    - *Block bootstrap, first-order only.* The calibrated p-values use a circular block
+      bootstrap (block ⌈T^{1/3}⌉ = 17–19 days). Its validity rests on asymptotic theory under
+      weak dependence and stationarity; expanding-window forecasts are not strictly
+      stationary, the block length is a rule of thumb, and its finite-sample size was not
+      simulated (too costly). Results with another block length may differ.
+    - *Inherited esreg defect (degenerate start).* esreg's starting value for its
+      location-scale fit can set a fitted sd to ~0, after which the covariance is invalid.
+      It affects P1 lasso QR at every level (no ESR values) and some bootstrap resamples
+      (counted as failures); it is the likely cause of the lasso-QR disagreement with esreg
+      noted below. The bootstrap p-values also rest on a conditional first-order argument
+      (stationarity, mixing, moments) checked by simulation, not proved for this estimator.
+    - *Covariance depends on a location-scale model.* esreg's variance estimator (ported here)
+      models Y's conditional mean and scale as linear in the forecast. For lasso QR that
+      linear scale fits worse than a log-linear one and esreg's start for it is degenerate
+      on P1 (its ES forecasts are continuous and varied: an earlier note here calling them
+      "heavily floored and tied" was wrong). Lasso QR's ESR results are quarantined
+      (Addition 9, amendment 8); before that, they differed from esreg by up to about 40%
+      in the intercept t, against < 5% for every other model.
+    - *Reference differences:* the port matches esreg to a median 0.5% (Wald) when esreg's
+      own location-scale optimisation is run to convergence. Unmodified esreg stops that
+      optimisation early, which alone changes its Wald by up to ~60% on some series; our
+      numbers therefore differ from a plain `esback::esr_backtest` call on those series.
+18. **Inference status of the backtests after the ESR failure (2026-11-11).** ESR inference
+    is retired (Addition 9, amendment 11): its bootstrap over-rejected under serially
+    dependent tail hits (block 20: up to 25% at nominal 5%). That failure is specific to
+    ESR, but it is a warning for every test used on persistent daily risk data, so each was
+    re-examined (`docs/EVIDENCE_STATUS.md`). Coverage (Christoffersen IND/CC) and DQ test
+    nulls under which dependence is the alternative, so they remain supported, with
+    few-hits caveats at 1% (DQ is known to be over-sized at low α). Diebold–Mariano, the
+    Model Confidence Set and the H3 HAC regression are asymptotically dependence-robust but
+    their finite-sample size under persistent, heavy-tailed FZ0 differentials is unchecked;
+    their p-values and MCS memberships are provisional. McNeil–Frey (few hits) and Z2
+    (assumed tail shape) are also unchecked. Means, ranks, hit rates and other estimates are
+    unaffected.
+19. **Most comparison tests are mis-sized on these data (Milestone 16, 2026-11-12).** A
+    frozen simulation study found Diebold–Mariano, the Model Confidence Set and the H3 HAC
+    regression over-reject badly when the loss differential has a slowly mean-reverting
+    component of the strength suggested by the real FZ0 series (DM up to 50% at nominal 5%,
+    MCS up to 99% false exclusions at 10%); fixed-b DM and block-40 MCS do not fix it. Their
+    p-values and MCS memberships are therefore descriptive only. The exact distortion depends
+    on persistence beyond lag 100, which the sample cannot pin down, but even the
+    median-matched design fails. Also unsupported: DQ at 1%, McNeil–Frey in most cells, Z2,
+    Kupiec at 1% and IND at 5% for lockbox-length samples. Christoffersen CC remains
+    supported everywhere. "Supported" means within the simulated dependence envelope only.

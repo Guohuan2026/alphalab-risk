@@ -161,7 +161,7 @@ print(m.describe().T[["mean", "std"]] * [12, 12**0.5])  # rough annualised mean 
 |---|---|
 | `command not found: alphalab` | venv not active → `source .venv/bin/activate` |
 | `ModuleNotFoundError: alphalab` | ran `pip install` outside the venv, or forgot `-e .` |
-| `ModuleNotFoundError: alphalab` *inside* the venv, in `~/Documents` | iCloud marked the `.pth` file hidden → `chflags nohidden .venv/lib/python3.12/site-packages/*.pth` |
+| `ModuleNotFoundError: alphalab` *inside* the venv, in `~/Documents` | iCloud marked the venv's `.pth` files hidden. Keep the venv outside iCloud: run `bash scripts/setup_mac.sh` (creates `~/.venvs/alphalab` and links `.venv` to it) |
 | `zsh: no matches found: .[dev]` | missing quotes → `pip install -e ".[dev]"` |
 | `end must be a fixed date in the past` | intended: set `end` to a past date in the YAML |
 | Yahoo returns nothing / 429 | rate-limited or API change → wait; `pip install -U yfinance` |

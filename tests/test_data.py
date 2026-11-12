@@ -93,6 +93,20 @@ def test_snapshot_roundtrip_and_hash(tmp_path, synthetic_prices):
     assert store.latest("synthetic") == info.snapshot_id
 
 
+def test_latest_matches_request(tmp_path, synthetic_prices):
+    # Two configs share a provider; the newer snapshot belongs to the OTHER config.
+    store = RawSnapshotStore(tmp_path)
+    meta = {"provider": "synthetic", "price_basis": "raw"}
+    req_a = {"tickers": ["AAA"], "start": "2020-01-01", "end": "2021-12-31"}
+    req_b = {"tickers": ["BBB"], "start": "2020-01-01", "end": "2021-12-31"}
+    a = store.save(synthetic_prices, meta, req_a, now=datetime(2026, 1, 1, tzinfo=UTC))
+    b = store.save(synthetic_prices, meta, req_b, now=datetime(2026, 1, 2, tzinfo=UTC))
+    assert store.latest("synthetic") == b.snapshot_id  # unfiltered: newest overall
+    assert store.latest("synthetic", req_a) == a.snapshot_id
+    with pytest.raises(FileNotFoundError, match="run ingest first"):
+        store.latest("synthetic", {"tickers": ["CCC"]})
+
+
 def test_snapshot_is_immutable(tmp_path, synthetic_prices):
     store = RawSnapshotStore(tmp_path)
     meta = {"provider": "synthetic", "price_basis": "raw"}

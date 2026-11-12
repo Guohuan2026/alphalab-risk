@@ -103,3 +103,369 @@ Why this is not look-ahead: a calendar records when the market was *open*, not p
 Scheduled holidays are published years ahead. Unscheduled closures are only known
 afterwards, but they can only change bookkeeping (a gap count, whether a month is
 finished), never a signal value.
+
+## 7. Risk features (AlphaLab-Risk)
+
+**Information set.** A feature stamped at session *t* may use anything *published by the end
+of day t*: after the close, before the next open. The risk forecast it feeds is for the loss
+on *t+1*. The label `next_day_loss` (L_{t+1} = −r_{t+1}) lives in `features/targets.py`. It
+deliberately fails the truncation test, and a test checks that it does.
+
+| Family | Columns | Formula / rule | Why |
+|---|---|---|---|
+| Returns | `ret`, `abs_ret`, `rv_1` | r_t, \|r_t\|, r_t² | Most recent shock |
+| HAR realized variance | `rv_5`, `rv_22`, `rv_66` | mean of r² over 5/22/66 sessions (full window required) | Volatility is persistent at week/month/quarter horizons (Corsi 2009) |
+| Range variance | `pk_1`, `gk_1`, `gk_5`, `gk_22` | Parkinson (ln H/L)²/(4 ln 2); Garman–Klass ½(ln H/L)² − (2 ln 2 − 1)(ln C/O)² | The intraday range is a more efficient variance proxy than r²; split-adjusted OHLC ratios are unaffected by splits |
+| Drawdown | `dd_252` | wealth / trailing-252 max − 1, with wealth = Π(1 + r) built forward | Stress state; never uses vendor backward-adjusted levels |
+| VIX | `vix`, `vix_chg_5` | same-day close; 5-session log change | Option-implied (forward-looking) volatility |
+| Credit / term spreads | `baa10y`, `t10y3m`, `*_chg_22` | FRED, **lagged 1 session**; 22-session difference (spreads can be negative, so no logs) | Funding and recession stress |
+
+**Alignment (`align_asof`).** Series dated on their own calendars (FRED observes on
+bond-market days, VIX on CBOE days) are put onto the portfolio's trading sessions by an
+*as-of* join. The value at session *t* is the latest observation dated on or before the
+session `lag` trading days earlier. Example: a FRED value observed Thursday is published
+Friday morning and so is first used on Friday; with Friday a holiday (Good Friday), it is
+first used the following Monday. A value more than 5 sessions old becomes NaN, so a
+discontinued series cannot pose as a calm market.
+
+**Snapshots.** Feature series are stored like prices (immutable, hashed), in a long
+`date, security_id, value` format under `data/raw/features/`. Every build records which
+feature snapshot it used.
+
+## 8. Simulated ground truth (GJR-GARCH-t)
+
+`risk/simulate.py` generates returns from a GJR-GARCH(1,1) with unit-variance Student-t
+innovations. Because σ_t is known at t−1, the *true* VaR and ES of each day are known in
+closed form:
+
+```
+VaR_a,t = −μ + σ_t · q_a,   q_a = −c·t_a
+ES_a,t  = −μ + σ_t · s_a,   s_a =  c · f_ν(t_a)/a · (ν + t_a²)/(ν − 1),   c = √((ν−2)/ν)
+```
+
+The formulas are checked against 4 million Monte Carlo draws, and the simulated true VaR
+has the right exceedance rate. Later, every risk model is first tested on this data. A
+correct GARCH should recover σ_t; coverage tests should accept the true VaR and reject a
+slow model during simulated volatility bursts. A useful fact for interviews: under a normal
+distribution ES/VaR at 1% is 1.15, but with ν = 6 it exceeds 1.2. So a model that is
+calibrated for VaR under normality still understates ES when tails are fat.
+
+## 9. Forecast engine and VaR coverage tests
+
+**Model contract** (`risk/models/base.py`). `fit(train)` estimates parameters on refit dates
+(every 21 sessions); `predict(history)` returns next-day VaR, ES and σ every day from all
+returns known at the origin. The same split is used in production: parameters are reviewed
+monthly, filters update daily. VaR/ES are positive loss numbers; α is the *tail
+probability* (0.01 = 99% VaR).
+
+**Walk-forward engine** (`risk/engine.py`). For each origin *t*: refit if due, then
+forecast the loss on *t+1*. Refit dates count from the first eligible origin, so they do not
+depend on later data. **Engine truncation test:** running on `returns[:d]` must give the
+identical forecast at origin *d* (tested for every model). **Lockbox:** origins whose target
+falls on or after `lockbox_start` (2023-01-01) are refused unless `--include-lockbox` is
+passed. Lockbox results are written and tested separately, never blended with the
+development sample.
+
+**Baselines.**
+- *Historical simulation* (HS-250, HS-500): empirical quantile and tail mean of the last N
+  losses. It reacts slowly, and a crash day drops out abruptly after N days.
+- *EWMA-normal* (RiskMetrics, λ = 0.94): σ²_{t+1} = λσ²_t + (1−λ)r_t², VaR = σz_α,
+  ES = σφ(z_α)/α. It reacts fast, but its tails are normal (thin).
+
+**Coverage tests** (`backtest/coverage.py`). Hit = L_{t+1} > VaR_t. Under a correct model
+hits are i.i.d. Bernoulli(α).
+- *Kupiec POF*: is the hit frequency α? LR ~ χ²(1).
+- *Christoffersen IND*: P(hit | hit yesterday) = P(hit | no hit yesterday)? LR ~ χ²(1).
+- *Conditional coverage*: CC = POF + IND ~ χ²(2).
+- *Basel traffic light* (99% VaR, 250-day windows): green 0–4, yellow 5–9, red 10+.
+
+How the tests themselves were validated:
+1. **Hand-computed values:** 5 hits in 250 days at 1% gives LR = 1.956, p = 0.162.
+2. **Size:** with a correct model, CC rejects about 5% of the time at the 5% level. So a
+   true model *will* occasionally be rejected. In the simulations, the true VaR failed once
+   in six checks (p = 0.011); that is expected, not a bug.
+3. **Power:** clustered hits at the correct frequency pass Kupiec but fail IND.
+4. **Simulated truth:** on GJR-GARCH-t data, the true VaR passes; EWMA-normal under-covers
+   at 1% (fat tails) but not at 5%; HS's hits cluster.
+
+What these tests cannot do: they say whether a model is *acceptable*, not which model is
+*better*. That needs loss functions (tick loss, FZ0) with Diebold–Mariano tests and a
+Model Confidence Set (week 2). They also ignore ES; ES backtests follow in week 2.
+
+## 10. GARCH-family models
+
+`risk/models/garch.py`; config types `garch`, `gjr`, `fhs`.
+
+```
+r_t = μ + σ_t z_t,  z_t ~ unit-variance t(ν)
+σ²_t = ω + (α + γ·1[ε_{t−1}<0]) ε²_{t−1} + β σ²_{t−1}        (γ = 0: plain GARCH)
+```
+
+- **Estimation:** maximum likelihood with `arch` on percent returns, converted to decimals.
+  Monthly refits, warm-started from the previous estimates.
+- **Daily filter:** the same function that generates the simulated truth
+  (`gjr_variance_filter`), so the timing is identical. It is updated one step per day
+  between refits, and a test checks this equals a full recompute.
+- **Tails:** GARCH-t and GJR-t use Student-t quantiles. **FHS** multiplies σ_{t+1} by the
+  empirical VaR/ES of the standardised residuals ẑ = (r − μ)/σ over the training window.
+  The first 50 residuals are dropped because the filter's start value still matters there.
+- **Failed refits:** non-convergence, persistence ≥ 1, ν ≤ 2 or ω ≤ 0 means the previous
+  parameters are kept and the failure counted (RESEARCH_DESIGN Deviations, clarification 1).
+  Parameters at every refit are saved to `fit_params.parquet`.
+
+**Validation on simulated GJR-GARCH-t data:**
+- Parameters are recovered: γ within 0.04, persistence within 0.015, ν within 1.5.
+- GJR's σ forecast is within about 2% (median) of the true σ. Plain GARCH, misspecified
+  here, has about 4× the error and still passes coverage, which is a reminder of how little
+  power coverage tests have.
+- Coverage is compared with the true VaR *on the same simulated path*, never against a fixed
+  p-value. On one path the true 5% VaR itself failed CC (p = 0.026): a Type I error that a
+  correct model cannot be expected to beat.
+
+## 11. Comparing models: losses, ES backtests, DM and MCS
+
+Coverage tests ask whether a model is *acceptable*; these tools ask which is *better*.
+
+- **Scoring rules** (`backtest/losses.py`). A loss is *strictly consistent* if its expected
+  value is minimised only by the true forecast. VaR (a quantile) has the **tick loss**
+  `(α − 1{y ≤ v})(y − v)`. ES alone has no such loss: it is not elicitable (Gneiting 2011).
+  The *pair* (VaR, ES) is (Fissler & Ziegel 2016). **FZ0** (Patton, Ziegel & Chen 2019):
+  `−1{y ≤ v}(v − y)/(α e) + v/e + ln(−e) − 1`, written in return space (v, e < 0). Its
+  differences do not depend on the units of returns. Tests confirm that misstating VaR
+  and/or ES by ±10% raises the mean FZ0.
+- **McNeil–Frey** (`backtest/es.py`). On VaR-hit days, ξ = L − ES should average zero;
+  H1: ES too small. Bootstrap p-value from centred residuals; a standardised version
+  divides by σ. Fewer than 5 hits gives NaN, not a p-value. `severity_ratio` = realised
+  mean tail loss / forecast ES.
+- **Diebold–Mariano** (`backtest/compare.py`). d = loss_A − loss_B; Newey–West HAC
+  variance (Bartlett, lag ⌊4(n/100)^{2/9}⌋). *Measured caveat:* with AR(1) differentials
+  (φ = 0.5) the naive t-test falsely rejects ~30%, HAC ~10%. So HAC removes most of the
+  distortion and DM p-values are mildly liberal under strong autocorrelation.
+- **Model Confidence Set** (Hansen, Lunde & Nason 2011, `arch.bootstrap.MCS`, range
+  statistic, block bootstrap, 90%): the set of models that cannot be distinguished from the
+  best. This is the **headline** comparison, because it controls for comparing many models
+  at once.
+
+Validation on simulated GJR-GARCH-t data (true VaR/ES known): FZ0 ranks the truth first,
+then GJR, FHS, GARCH, EWMA, HS. The MCS keeps {truth, GJR, FHS} and drops HS and EWMA. DM
+finds GJR better than EWMA (p = 0.015). McNeil–Frey rejects EWMA's normal ES
+(severity 1.10) and accepts the truth and GJR.
+
+## 12. Feature-based models and the linear benchmarks
+
+**Feature contract.** Feature models receive the feature rows for the same dates as the
+returns. Training pairs are (x_s, r_{s+1}), the last being (x_{t−1}, r_t); the forecast
+for t+1 uses x_t. Tests check this with a model that records what it is given, and the
+engine truncation test is repeated with features.
+
+**HAR-FHS** (`har`). OLS of r²_{s+1} on [1, RV1_s, RV5_s, RV22_s] (Corsi 2009); variance
+floored at 5% of the training variance; FHS tails from residuals z = r/σ̂. *Known bias:* the
+regressors are noisy proxies of σ², so OLS coefficients are attenuated (errors in
+variables). On simulated GJR data they sum to about 0.71 against a true persistence of 0.98.
+Intraday realized variance would reduce this.
+
+**Linear quantile regression.** `linqr`: q_τ(r_{s+1}|x_s) = x_s'β_τ for τ ∈ {α} ∪
+{α(k−½)/K}, K = 5; ES = −mean of the sub-α quantiles; quantiles sorted across levels to
+prevent crossing; features clipped to training [0.5%, 99.5%] quantiles and standardised
+with training moments. `linqr_l1` (the H2b control): the same model with an L1 penalty,
+λ tuned at each yearly refit on the last 20% of the training pairs (1-pair embargo;
+statistics for tuning from the earlier part only), exact LP solver (HiGHS).
+
+**Why plain linear QR failed on SPY** (a finding, RESULTS_LOG): collinear features get
+large offsetting coefficients, and on stress days (e.g. after 1997-10-27, Lehman
+2008-09-15) the offset breaks and the 5% quantile turns positive. Clipping alone was not
+enough; L1 shrinkage plus the floor were needed (RESEARCH_DESIGN Deviation 2).
+
+**Safety floor** (engine, every model): VaR ≥ 1 bp and ES ≥ VaR. Invalid forecasts are
+flagged and scored, never dropped, so all models stay on the same dates.
+
+## 13. Machine-learning models (`risk/models/ml.py`, specified in Deviation 3)
+
+| Model | What it learns | VaR / ES |
+|---|---|---|
+| `qrf`: quantile regression forest (Meinshausen 2006) | a forest whose leaves keep the training targets, i.e. a full conditional distribution | quantiles at α and α(k−½)/K; ES = mean of the sub-α quantiles |
+| `gbq`: gradient boosting, pinball loss (scikit-learn `HistGradientBoostingRegressor`) | one boosted model per quantile level | same as QRF; quantiles sorted to stop crossing |
+| `mlvol_fhs`: RF volatility + FHS | a random forest for \|r_{s+1}\|, a volatility proxy | σ̃_t × empirical VaR/ES of **out-of-bag** residuals r/σ̃ |
+
+- **Identical tuning** (one shared class, also used by the lasso control): last 20% of the
+  training pairs, 1-pair embargo, mean tick loss over the VaR levels, ties → first config,
+  refit + re-tune every 252 sessions, `random_state = 0`.
+- **Why out-of-bag residuals:** a forest's in-sample fit nearly memorises |r|, so in-sample
+  residuals are too small and VaR would be too low. A test shows the out-of-bag tail is
+  larger.
+- **Block prediction:** between refits these models depend only on x_t, so the engine
+  predicts a refit block in one call. A test checks the result is identical to day-by-day
+  prediction.
+- **Determinism (found by a test):** scikit-learn random forests predicting with
+  `n_jobs = -1` sum tree outputs in thread order, and floating-point addition is not
+  associative, so repeated runs differed in the last bits and flipped a tuning tie. Fitting
+  stays parallel; prediction is single-threaded. Every ML model now has a bit-identical
+  refit test.
+- **Validation on simulated GJR-GARCH-t data:** all three land between the truth and HS on
+  FZ0 but do not beat the true parametric model, a check that the evaluation does not
+  automatically reward flexibility. The quantile forest had 2 floored forecasts even
+  there: a leaf whose training returns are mostly gains can give a positive 5% quantile.
+
+## 14. Stress analysis (H3) (`stress/analysis.py`; rules: Clarification 4)
+
+- **Regimes:** 8 ex-ante episodes, assigned by *target date*; calm = no episode. VIX regime
+  by VIX at the *origin* (> 30), known when the forecast is made. Conditioning on the
+  outcome would bias the comparison.
+- **Per regime and model:** n, expected and observed hits, Kupiec p, mean FZ0, ES severity.
+  The expected-hits column is the power warning (e.g. 6.9 expected at 1% when VIX > 30).
+- **Tests vs the benchmark (FHS-GJR):** DM within regimes; HAC regression d = a + b·D + e,
+  where *a* is the calm-period difference and *b* the extra difference in stress (H3: b ≠ 0).
+  The HAC regression matches statsmodels exactly (test). Regimes with < 30 days (or < 30
+  outside) get no DM, regression or MCS: a short sample can contain no episode day, and the
+  dummy would be degenerate (a bug found by a test).
+- **Power lesson from simulated data:** HS broke down in the high-volatility regime (hit
+  rate 2.6× the target), yet its FZ0 stress shift was not significant (p ≈ 0.2), because
+  FZ0 is very noisy on volatile days. A non-significant b is therefore *not* evidence that
+  stress makes no difference; read it together with the hit rates.
+- **Event study:** the 1% largest losses; VaR path k = −5..20 relative to k = −5; the
+  committed summary is "days to 1.5×". Because large losses usually strike when VaR is
+  already elevated, the k = 1 and k = 5 ratios are reported too, as extra description.
+
+## 15. Interpretability (H4) (`explain/importance.py`; rules: Clarification 5)
+
+- **Permutation importance:** at each yearly refit, the chosen configuration is refitted on
+  the tuning part and each feature is shuffled on the validation part (5 repeats). The
+  rise in mean tick loss is that feature's importance, measured out of sample for the model
+  being scored. It answers: "how much worse do forecasts get without this information?"
+- **TreeSHAP** (Lundberg & Lee): an exact decomposition of a tree model's prediction into
+  a base value plus one contribution per feature, with base + contributions = prediction
+  (tested to 1e-9). For the RF-volatility hybrid, VaR = q·σ̃ is linear in the forest's
+  prediction, so VaR contributions = q × SHAP. For boosting, SHAP explains the *raw* 1%
+  quantile model; the reported VaR differs on days where the per-level models cross and
+  are sorted. The explain run reports that share. TreeSHAP cannot explain the quantile
+  forest's quantiles (it explains a forest's mean), so QRF gets permutation importance only.
+- **Same models as the forecasts:** the explain pass refits on the engine's schedule;
+  refits are bit-identical, and `explain_check.csv` compares the SHAP-implied VaR with the
+  saved forecasts.
+- **Criteria (fixed before results):**
+  - C1: the top-3 features by mean permutation importance are volatility or VIX features.
+  - C2: every volatility/VIX feature's SHAP contribution rises with its value.
+  - C3: median Spearman rank correlation of importances between consecutive refits ≥ 0.6.
+- **Caveat:** importance is not causation. Correlated features (rv_5, rv_22, gk_22) share
+  credit: permuting one while its twins remain understates the family's importance. That is
+  why C1 is stated at the family level.
+
+## 16. Reproducibility
+
+- **Data:** immutable, hash-verified raw snapshots; every build and forecast run records the
+  snapshot it used.
+- **Code:** git history on GitHub (`Guohuan2026/alphalab-risk`), with design, clarifications
+  and lockbox protocol committed before the results they govern.
+- **Environment:** `requirements-lock.txt` pins the exact package versions behind every
+  logged result; `scripts/setup_mac.sh` installs them as constraints. *Why it is needed:* a
+  clean clone on 2026-11-07 installed `quantile-forest` 1.5.0 instead of 1.4.2, and its
+  quantile forecasts differed materially from the logged ones (LIMITATIONS #14). Unpinned
+  "latest" installs are not reproducible research.
+- **Determinism:** fixed seeds; single-threaded forest prediction; bit-identical refit
+  tests; dev-period forecasts re-checked bit-for-bit in the lockbox runs.
+
+## 17. Engle–Manganelli Dynamic Quantile test (`backtest/coverage.py: dq_test`)
+
+Regress the demeaned hit Hit_t = 1[L_t > VaR_t] − α on a constant, its own 4 lags and VaR_t.
+Under a correct VaR all coefficients are zero; DQ = β̂'X'Xβ̂ / (α(1 − α)) ~ χ²(6). It nests
+Kupiec (constant) and Christoffersen (lag 1) and adds the VaR regressor, which catches
+breaches that depend on the forecast's level. Example from the tests: breaches at 8% when
+VaR is low and 2% when it is high average 5%, show no clustering, and pass both classical
+tests, but DQ rejects them with p < 1e-6. Output: `backtest_dq.csv`. Development samples only
+(added after the lockbox was opened; RESULTS_LOG).
+
+## 18. Acerbi–Szekely Z2 ES test (`backtest/es.py: acerbi_szekely_z2`; Clarification 7)
+
+Z2 = 1 − (1/(T·α)) Σ_t L_t·1[L_t > VaR_t] / ES_t. If VaR and ES are right, E[Z2] = 0; a
+negative value means breaches are too frequent, too severe, or both. Unlike McNeil–Frey,
+which looks only at the model's own breach days, Z2 scores frequency and severity together.
+
+Its null distribution depends on the shape of the tail, and the models' full predictive
+distributions are not stored. The p-value is therefore Monte Carlo (10,000 draws) under a
+*shape-matched* Student-t: ν is chosen so that the t's ES/VaR ratio equals the median of the
+model's own ES_t/VaR_t (EWMA's normal tails give ν ≈ ∞). Only breaches matter, so a draw is
+a Binomial(T, α) number of breaches with t tail quantiles; scale cancels in L/ES.
+
+Validated in the tests: the ν inversion recovers 3, 6 and 20 exactly; under H0 with a
+time-varying scale the test rejects about 5% of the time; with VaR right and ES 20% too
+small (5,000 days) its power is about 0.83, against 1.00 for McNeil–Frey, which is sharper
+for pure ES errors. Output: `backtest_z2.csv`, with a `preregistered` flag for the models
+named in RESEARCH_DESIGN §7. Development samples only (LIMITATIONS #15).
+
+## 19. Ten-day horizon, descriptive (`backtest/horizon.py`; Clarification 8)
+
+Forecast: VaR₁₀ = √10·VaR₁ and ES₁₀ = √10·ES₁, from each model's saved 1-day forecast at
+origin t (no refitting, so no new estimation or leakage risk). Outcome (a label, evaluation
+only): L₁₀ = −(Π_{i=1..10}(1 + R_{t+i}) − 1), computed from cumulative log growth. Windows
+are non-overlapping (every 10th trading day from the first origin all models share) and
+must end before the lockbox start. Reported per model and α: windows, breaches vs T·α,
+breach ratio, realised/forecast ES on breach windows, mean FZ0 and its rank. No tests.
+
+Why √10 can fail: it is exact only for i.i.d. zero-mean returns. If today's volatility is
+high and reverts within days, √10 × today's σ overstates 10-day risk; persistent or rising
+volatility, fat tails and loss clustering make it understate. Tests show both sides: about
+the right breach count for i.i.d. normal returns, and almost no breaches when a one-day
+volatility spike is scaled by √10. They also check that the label at t uses exactly
+R_{t+1..t+10}, that windows never overlap or cross the lockbox, and that forecasts are used
+as saved. Command: `alphalab horizon --config <yaml>` → `horizon10.csv`.
+
+## 20. Bayer–Dimitriadis ESR backtest (`backtest/es.py: esr_backtest`; Addition 9)
+
+McNeil–Frey and Z2 ask whether ES is right *on average*. The expected-shortfall regression
+(ESR) backtest asks whether it is right *conditionally*: regress realised returns on the ES
+forecast in a joint quantile + ES regression, and test whether the ES equation is the identity.
+Returns convention: Y_t = −L_{t+1}, ê_t = −ES_t (forecast made at t). Reference
+implementation: the authors' R packages esreg 0.6.3 and esback 0.3.1.
+
+- *Estimation.* The joint M-estimator that minimises mean FZ0 loss (G1 = 0, G2(z) = −1/z,
+  as `esback::esr_backtest`). Given e, the quantile part is a pinball loss weighted by
+  1/(−e_t), solved exactly as a linear programme; given q, the ES part has the first-order
+  condition Σ X(e − S)/e² = 0 with S_t = q_t + (Y_t − q_t)·1[Y_t ≤ q_t]/α, solved by iterated
+  weighted least squares with step halving. The blocks alternate until the joint loss stops
+  falling. Y is shifted by max(Y) while fitting (as esreg); before that, losses and forecasts
+  are divided by sd(loss), so the result does not depend on units.
+- *Covariance.* A formula-by-formula port of esreg's `vcovA` (nid density, "scl_sp"
+  truncated variance, misspecification terms). The bread uses the Hendricks–Koenker density
+  and a smoothed conditional CDF; the meat is model-based: the conditional truncated variance
+  of the quantile residuals from a Gaussian location-scale fit plus a Sheather–Jones kernel
+  density. esreg's fall-backs are kept. The one numerical deviation that matters: the
+  location-scale ML fit is iterated to convergence (esreg's stops early).
+- *Strict ESR:* regressors (1, ê_t) in both equations; H0 (γ0, γ1) = (0, 1); Wald test, χ²(2).
+  Secondary.
+- *One-sided intercept ESR:* Z_t = Y_t − ê_t, quantile on (1, ê_t), ES on a constant; H0
+  γ0 = 0 against γ0 < 0 (ES understated); p = Φ(γ̂0/se). **This is the ESR result we read.**
+- *Unavailable results* (too few tail observations, constant forecast, failed fit,
+  ill-conditioned sandwich) are NaN with a reason in `strict_status` / `int_status`; the
+  other test still runs.
+- *Serial dependence.* `alphalab esr-bootstrap --diagnose` tests the fitted intercept-ESR
+  scores for autocorrelation (Ljung–Box, 10 lags; Newey–West long-run / iid variance ratio).
+  Both the asymptotic covariance and an iid bootstrap assume none; on our data most cells
+  have it, so the asymptotic p-values are descriptive.
+- *Bootstrap.* `alphalab esr-bootstrap` computes studentised **circular block** bootstrap
+  p-values (B = 999, block ⌈T^{1/3}⌉; `--block 1` gives esback's iid pairs bootstrap, which
+  is not valid here). Studentising by the iid covariance is fine: the block bootstrap
+  reproduces the distribution of that statistic, autocorrelation included. The job is
+  resumable: deterministic per-chunk seeds, atomic chunk files, a manifest that refuses
+  mixed inputs (including another block length), a worker cap, low priority, a wall-clock
+  budget, a lock file and a progress log. `--plan` estimates the run time; `--summarize`
+  writes `backtest_esr_bootstrap.csv`.
+
+Why the covariance matters (2026-11-10): an earlier version used the empirical outer
+product of the scores as the meat. It is consistent, but with heavy tails it was badly
+biased in finite samples: the strict test rejected a correct model 21% of the time at
+T = 1,000. esreg's model-based meat brings that to 2.5–7.3%.
+
+Validated in the tests: the LP quantile regression matches the order statistic and the
+weighted version matches replicated data; the intercept-only ES step equals the sample ES; a
+Nelder–Mead search cannot lower the joint FZ0 loss from our solution; three fixed comparisons
+with esreg (5% tolerance); unit invariance and stability under last-bit perturbations;
+degenerate samples. Simulated size and power are in Addition 9. Output: `backtest_esr.csv`.
+Development samples only.
+
+**Status (2026-11-11): retired from inference (Addition 9, amendment 11).** The asymptotic
+p-values are over-sized under the serial dependence present in the real scores; the
+pre-registered block bootstrap is unusable (zero-sd boundary fits of the location-scale
+model) and the amended one (esreg's independence covariance, misspec = FALSE) failed the
+pre-specified size check (amendment 10(k)). The estimator, the esreg port and all validation
+code are kept; γ̂, Wald and t are reported as descriptive diagnostics only. How every other
+test stands: `docs/EVIDENCE_STATUS.md`.

@@ -1,0 +1,55 @@
+# AlphaLab-Risk P3: Canadian equity, iShares S&P/TSX 60 (XIU.TO), in CAD.
+# Uses the Toronto Stock Exchange calendar (XTSE): Canada Day, Victoria Day, etc.
+# Never mixed with USD assets (no FX handling; see docs/LIMITATIONS.md #6).
+provider: yahoo
+universe: [XIU.TO]
+start: "1999-10-01"
+end: "2026-10-30"
+data_dir: data
+monthly_min_obs: 15
+calendar: XTSE
+provider_options:
+  pause_seconds: 0.5
+  max_retries: 2
+validation:
+  extreme_return: 0.4
+  max_gap_sessions: 5
+  vendor_adj_tolerance: 0.002
+portfolio:
+  name: p3_xiu
+  weights: {XIU.TO: 1.0}
+  rebalance: daily
+features:
+  # US stress indicators used as global proxies (open question: Canadian alternatives such
+  # as a TSX volatility index or CAD credit spreads; see RESEARCH_DESIGN.md §5).
+  yahoo_levels: ["^VIX"]
+  fred: [BAA10Y, T10Y3M]
+  fred_lag_sessions: 1
+  range_asset: XIU.TO
+risk:                    # docs/RESEARCH_DESIGN.md §4-5; `alphalab forecast` then `alphalab backtest`
+  alphas: [0.01, 0.025, 0.05]   # tail probabilities: VaR 99% / 97.5% / 95%
+  min_train: 1000        # ~4 years of history before the first forecast
+  refit_every: 21        # re-estimate parameters monthly; filters update daily
+  window: expanding
+  oos_start: "1997-01-02"   # first origin (later if 1000 sessions are not yet available)
+  lockbox_start: "2023-01-01" # held out: opened ONCE with --include-lockbox
+  var_floor: 0.0001       # safety floor for every model: VaR >= 1bp, ES >= VaR (Deviation 2)
+  benchmark: fhs_gjr      # reference for stress DM tests and regressions (Clarification 4)
+  models:
+    - {type: hs, window: 250}
+    - {type: hs, window: 500}
+    - {type: ewma, lam: 0.94}
+    - {type: garch}        # GARCH(1,1)-t
+    - {type: gjr}          # GJR-GARCH(1,1)-t (leverage)
+    - {type: fhs}          # filtered HS: GJR volatility x empirical residual tails
+    - {type: har}          # HAR variance regression + empirical residual tails (linear)
+    # H2b control: lasso quantile regression on all features, penalty tuned yearly on the last
+    # 20% of the training window (Deviation 2: plain QR gave invalid forecasts, collinearity)
+    - {type: linqr, l1_grid: [0.0, 1.0e-5, 1.0e-4, 1.0e-3], refit_every: 252}
+    # ML models (Deviation 3): yearly refit + tuning on the last 20% of the training window
+    - {type: qrf}          # quantile regression forest
+    - {type: gbq}          # gradient boosting, quantile loss (XGBoost unavailable: libomp)
+    - {type: mlvol}        # random-forest volatility + out-of-bag FHS tails
+corrections:             # applied at build; data/raw untouched (docs/LIMITATIONS.md #12)
+  non_cash_dividends:    # reinvested year-end distributions: Yahoo's adjusted close implies
+    XIU.TO: ["2000-12-27", "2003-12-29", "2004-12-29"]   # no payout; no price drop

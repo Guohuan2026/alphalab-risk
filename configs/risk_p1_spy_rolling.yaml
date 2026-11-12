@@ -1,0 +1,53 @@
+# ROBUSTNESS (rolling window) for AlphaLab-Risk P1: US equity, SPY total return incl. dividends.
+# ^SP500TR (S&P 500 total-return index) is ingested alongside as an independent cross-check
+# of our own dividend-inclusive SPY returns; it is NOT part of the portfolio.
+# See docs/RESEARCH_DESIGN.md §3-4. OOS 1997-2022; lockbox 2023-01-01 .. 2026-10-30.
+provider: yahoo
+universe: [SPY, ^SP500TR]
+start: "1993-01-01"
+end: "2026-10-30"        # fixed past date for reproducibility (last session of Oct 2026)
+data_dir: data
+monthly_min_obs: 15
+calendar: XNYS
+provider_options:
+  pause_seconds: 0.5
+  max_retries: 2
+validation:
+  extreme_return: 0.4
+  max_gap_sessions: 5
+  vendor_adj_tolerance: 0.002
+portfolio:
+  name: p1_spy
+  weights: {SPY: 1.0}
+  rebalance: daily
+features:                # docs/METHODOLOGY.md §7; downloaded by `alphalab ingest`
+  yahoo_levels: ["^VIX"] # same-day (published at the close)
+  fred: [BAA10Y, T10Y3M] # credit and term spreads, lagged 1 session (published next morning)
+  fred_lag_sessions: 1
+  range_asset: SPY       # SPY high/low/open/close -> range-based variance
+risk:                    # docs/RESEARCH_DESIGN.md §4-5; `alphalab forecast` then `alphalab backtest`
+  alphas: [0.01, 0.025, 0.05]   # tail probabilities: VaR 99% / 97.5% / 95%
+  min_train: 1000        # ~4 years of history before the first forecast
+  refit_every: 21        # re-estimate parameters monthly; filters update daily
+  window: rolling
+  window_size: 1000      # rolling 1000-session estimation window (RESEARCH_DESIGN §4 robustness)
+  oos_start: "1997-01-02"   # first origin (later if 1000 sessions are not yet available)
+  lockbox_start: "2023-01-01" # held out: opened ONCE with --include-lockbox
+  var_floor: 0.0001       # safety floor for every model: VaR >= 1bp, ES >= VaR (Deviation 2)
+  benchmark: fhs_gjr      # reference for stress DM tests and regressions (Clarification 4)
+  run_tag: rolling1000   # results in data/results/p1_spy/<snapshot>/rolling1000
+  models:
+    - {type: hs, window: 250}
+    - {type: hs, window: 500}
+    - {type: ewma, lam: 0.94}
+    - {type: garch}        # GARCH(1,1)-t
+    - {type: gjr}          # GJR-GARCH(1,1)-t (leverage)
+    - {type: fhs}          # filtered HS: GJR volatility x empirical residual tails
+    - {type: har}          # HAR variance regression + empirical residual tails (linear)
+    # H2b control: lasso quantile regression on all features, penalty tuned yearly on the last
+    # 20% of the training window (Deviation 2: plain QR gave invalid forecasts, collinearity)
+    - {type: linqr, l1_grid: [0.0, 1.0e-5, 1.0e-4, 1.0e-3], refit_every: 252}
+    # ML models (Deviation 3): yearly refit + tuning on the last 20% of the training window
+    - {type: qrf}          # quantile regression forest
+    - {type: gbq}          # gradient boosting, quantile loss (XGBoost unavailable: libomp)
+    - {type: mlvol}        # random-forest volatility + out-of-bag FHS tails

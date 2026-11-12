@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import platform
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +25,8 @@ import pandas as pd
 
 import alphalab
 from alphalab.data.schema import KEY, check_schema
+
+DATA_FILE = "prices.parquet"  # kept for every snapshot kind so old snapshots stay readable
 
 
 def content_hash(df: pd.DataFrame) -> str:
@@ -51,8 +54,11 @@ class RawSnapshotStore:
         provider_meta: dict,
         request: dict,
         now: datetime | None = None,
+        validate: Callable[[pd.DataFrame], None] = check_schema,
     ) -> SnapshotInfo:
-        check_schema(df)
+        """Save once, never overwrite. ``validate`` is the schema check (prices by default;
+        ``check_series_schema`` for feature series)."""
+        validate(df)
         now = now or datetime.now(UTC)
         digest = content_hash(df)
         provider = provider_meta["provider"]
@@ -82,7 +88,7 @@ class RawSnapshotStore:
                 "platform": platform.platform(),
             },
         }
-        df.to_parquet(path / "prices.parquet", index=False)
+        df.to_parquet(path / DATA_FILE, index=False)
         (path / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
         return SnapshotInfo(provider, snapshot_id, path, manifest)
 
@@ -90,18 +96,30 @@ class RawSnapshotStore:
         d = self.root / provider
         return sorted(p.name for p in d.iterdir() if p.is_dir()) if d.exists() else []
 
-    def latest(self, provider: str) -> str:
+    def latest(self, provider: str, request: dict | None = None) -> str:
+        """Newest snapshot for ``provider``; with ``request``, the newest whose saved request
+        (tickers, start, end) equals it. Without the filter, several configs sharing one
+        provider (e.g. three Yahoo portfolios) would silently pick each other's data."""
         snaps = self.list(provider)
+        if request is not None:
+            snaps = [s for s in snaps if self._request(provider, s) == request]
         if not snaps:
-            raise FileNotFoundError(f"no snapshots for provider '{provider}' under {self.root}")
+            what = f" matching request {request}" if request is not None else ""
+            raise FileNotFoundError(
+                f"no snapshots for provider '{provider}'{what} under {self.root}; run ingest first"
+            )
         return snaps[-1]  # IDs start with a UTC timestamp, so lexical order == time order
+
+    def _request(self, provider: str, snapshot_id: str) -> dict | None:
+        manifest = json.loads((self.root / provider / snapshot_id / "manifest.json").read_text())
+        return manifest.get("request")
 
     def load(
         self, provider: str, snapshot_id: str, verify: bool = True
     ) -> tuple[pd.DataFrame, dict]:
         path = self.root / provider / snapshot_id
         manifest = json.loads((path / "manifest.json").read_text())
-        df = pd.read_parquet(path / "prices.parquet")
+        df = pd.read_parquet(path / DATA_FILE)
         if verify and content_hash(df) != manifest["content_sha256"]:
             raise ValueError(f"content hash mismatch for {path}: file was modified")
         return df, manifest

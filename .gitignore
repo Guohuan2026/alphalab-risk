@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv
+.venv.old*/
 .pytest_cache/
 .ruff_cache/
 .coverage
@@ -11,6 +13,7 @@ htmlcov/
 # Data: never commit downloaded or derived data (size, licensing - CRSP is licensed!)
 data/raw/
 data/processed/
+data/results/
 
 # OS / editors
 .DS_Store
@@ -18,3 +21,6 @@ data/processed/
 
 # Run logs
 logs/
+
+# Local tool settings (preview launch config)
+.claude/
