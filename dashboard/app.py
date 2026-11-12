@@ -154,6 +154,11 @@ with tabs[0]:
             hide_index=True,
             width="stretch",
         )
+        st.caption(
+            "Coverage p (CC) is supported inference. MCS membership and MCS p are descriptive "
+            "only: the MCS excluded equally good models far too often in a size check under "
+            "realistic persistence " + "(Milestone 16 calibration; docs/EVIDENCE_STATUS.md)."
+        )
 
 # ---------------------------------------------------------------- forecasts
 with tabs[1]:
@@ -336,7 +341,10 @@ with tabs[2]:
             )
             st.caption(
                 "Ratio above 1 = ES understates real tail losses (the dangerous direction). "
-                "Acerbi–Szekely Z2 below 0 = breaches too frequent and/or too severe"
+                "Acerbi–Szekely Z2 below 0 = breaches too frequent and/or too severe. "
+                "McNeil–Frey and Z2 p-values are descriptive in most cells: both over-reject "
+                "when volatility dynamics are misspecified (Milestone 16 calibration; "
+                "docs/EVIDENCE_STATUS.md)"
                 + (
                     "."
                     if z2 is not None
@@ -360,6 +368,11 @@ with tabs[2]:
                     )
         if dm is not None:
             st.subheader("Diebold–Mariano on FZ0 (row vs column; negative = row better)")
+            st.caption(
+                "Descriptive only: the DM test over-rejected badly (up to 50% at nominal 5%) "
+                "in a size check with persistent loss differentials, so these p-values do not "
+                "establish significance " + "(Milestone 16 calibration; docs/EVIDENCE_STATUS.md)."
+            )
             d = dm[dm.alpha == alpha]
             names = sorted(
                 set(d.model_a) | set(d.model_b), key=lambda m: (m not in D.MODEL_ORDER, D.label(m))

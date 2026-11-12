@@ -61,7 +61,12 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
     McNeil–Frey and Z2 at the real numbers of hits and under a wrong tail shape; Monte Carlo
     p-values for 1% coverage/DQ. Outcome: each headline significance claim either moves to
     "supported" or is restated as descriptive.
-17. **Research report v2** (`docs/REPORT.md`): every claim tagged by evidence category;
+    **Done 2026-11-12** (Addition 10): DM, MCS, H3, Z2 and most McNeil–Frey cells unsupported;
+    CC supported everywhere, POF/IND/DQ in most cells (`docs/EVIDENCE_STATUS.md`). As frozen,
+    fixed-b replaced the HLN correction (HLN scales the statistic by ≈ 1 at these T and cannot
+    remove the distortion); Monte Carlo coverage/DQ p-values were recommended, not simulated.
+17. **Research report v2** (`docs/REPORT.md`): every claim tagged by evidence category, with all
+    DM/MCS/H3 "significant" wording restated as descriptive (Milestone 16);
     figures generated from saved results; a methods appendix on the ESR negative result
     (esreg port, the degenerate-start defect, the size failure under dependence); limitations
     and reproducibility sections; supervisor-ready PDF.

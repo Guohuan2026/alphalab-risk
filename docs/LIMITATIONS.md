@@ -136,3 +136,13 @@ they can distort conclusions.
     their p-values and MCS memberships are provisional. McNeil–Frey (few hits) and Z2
     (assumed tail shape) are also unchecked. Means, ranks, hit rates and other estimates are
     unaffected.
+19. **Most comparison tests are mis-sized on these data (Milestone 16, 2026-11-12).** A
+    frozen simulation study found Diebold–Mariano, the Model Confidence Set and the H3 HAC
+    regression over-reject badly when the loss differential has a slowly mean-reverting
+    component of the strength suggested by the real FZ0 series (DM up to 50% at nominal 5%,
+    MCS up to 99% false exclusions at 10%); fixed-b DM and block-40 MCS do not fix it. Their
+    p-values and MCS memberships are therefore descriptive only. The exact distortion depends
+    on persistence beyond lag 100, which the sample cannot pin down, but even the
+    median-matched design fails. Also unsupported: DQ at 1%, McNeil–Frey in most cells, Z2,
+    Kupiec at 1% and IND at 5% for lockbox-length samples. Christoffersen CC remains
+    supported everywhere. "Supported" means within the simulated dependence envelope only.

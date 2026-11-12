@@ -745,3 +745,30 @@ gate written first:
 No ESR result above is held-out evidence. The other backtests were re-examined rather than
 presumed valid: `docs/EVIDENCE_STATUS.md` (coverage and DQ supported; DM, MCS, H3 HAC,
 McNeil–Frey and Z2 p-values provisional pending a calibration check; estimates unaffected).
+
+---
+
+## 2026-11-12 — Milestone 16: finite-sample calibration of the backtests (exploratory, simulation only)
+
+Design frozen before running (RESEARCH_DESIGN Addition 10; Codex pre-run fixes 10(j);
+commit `b47c95e`). R = 2,000, seed 20261112, T = 6,535 and 961, 4 low-priority cores,
+10:11–11:29 EST. All cells complete, no lockbox access. Classification per test, length and
+α in `docs/EVIDENCE_STATUS.md`; data in `data/results/calibration/`.
+
+- **Diebold–Mariano, MCS and the H3 HAC regression: unsupported.** Size is correct with
+  i.i.d. differentials (DM 4.1–5.1%, H3 5.2–6.0%), but a slowly mean-reverting component
+  matched to the real FZ0 differentials' autocorrelation and long-run-variance ratios gives
+  DM 13.9–50.1%, H3 9.3–30.2% and MCS false exclusions of 39–99% (nominal 5% / 10%). The
+  pre-declared fallbacks (fixed-b DM; block-40 MCS) also fail. H3's fixed-b result was a
+  diagnostic only (Codex pre-run review).
+- **Coverage:** Christoffersen CC supported at every α and length; IND except lockbox-length
+  5% (9.0%); Kupiec POF except lockbox-length 1% (7.0%, discreteness).
+- **DQ:** supported at 5% (and 2.5% at T = 6,535); over-sized at 1% (7.8–11.1%).
+- **McNeil–Frey:** unsupported in most cells (over-rejects with missed volatility at 2.5% and
+  5%; no result in up to 37% of samples with ≈ 10 hits). **Z2:** unsupported (14–31% when
+  volatility dynamics are misspecified).
+- **Effect on the report:** every "significantly" based on DM, MCS or the H3 regression
+  becomes descriptive. FHS-GJR's coverage results stand ("not rejected", not "confirmed");
+  DQ's rejections stand at 2.5% and 5%; the lockbox "NOT REPLICATED" verdict is unchanged
+  (it fails on mean-FZ0 ordering alone). Codex post-run review: classifications match the
+  frozen rules.

@@ -819,3 +819,11 @@ Format: date · section · change · reason · made before/after seeing affected
     a Monte Carlo DQ p-value must rebuild the lagged-hit regressors in every draw and
     conditions on the observed VaR path (valid under the null that hits are i.i.d. and
     independent of past information including VaR). Revised cost ≈ 1.2 h on 4 cores.
+    (k) *Result (2026-11-12, run 10:11–11:29 EST on `b47c95e`; every cell complete; no
+    threshold or design changed after results):* DM, H3 and MCS UNSUPPORTED at both lengths
+    (fallbacks fail); CC SUPPORTED at every α and length; IND SUPPORTED except T = 961 α 5%;
+    POF SUPPORTED except T = 961 α 1%; DQ SUPPORTED at 5% (both lengths) and 2.5% (T = 6,535),
+    UNSUPPORTED otherwise; McNeil–Frey SUPPORTED only raw at T = 6,535 α 1% and T = 961 α 5%,
+    and standardised at T = 6,535 α 1%; Z2 UNSUPPORTED. A post-hoc, non-frozen MCS sanity
+    check (11 i.i.d. models) gave 11.7% at nominal 10%. Classification in
+    `docs/EVIDENCE_STATUS.md`. Codex post-run review: classifications match the frozen rules.

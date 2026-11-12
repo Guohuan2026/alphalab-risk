@@ -154,3 +154,28 @@ approval" (autonomy.md), unscoped `Edit`/`Write` widen the scoped edit allow-lis
 `esr-robust-start` (made at the owner's request) were issued as compound shell commands, which
 that pattern did not catch. From now on, commits on `alphalab-risk` go through
 `autonomy.py publish` only.
+
+## 2026-11-12 — Milestone 16 (owner-approved): pre-run review of the calibration design
+
+Design frozen and pushed first (`b6c5936`, CI green). **Codex pre-run review (Agent HUD
+m-33c28ffb07fc / reply m-6b484d2095eb):** null constructions OK in every gated design;
+three MAJORs: (1) missing designs or replications could still yield SUPPORTED; (2) Dhigh
+under-matches the upper default-lag LRV ratio, so a pass would overstate coverage; (3) the
+fixed-b fallback is not theoretically justified for H3's persistent deterministic dummy (and
+DM's claim is qualified by the variance calendar). MINORs: thresholds lenient relative to
+R = 2,000; report finite-only rates and hit strata; pin parameters and hashes; DQ remedy
+details. **Action (all adopted before any result):** exact-set and replication-ID checks
+with regression tests; new gated design Dhigh2 matching both upper targets; H3 fixed-b never
+adopted, DM fixed-b labelled empirical; finite-only rates, hit strata, strict-tolerance flag
+(thresholds unchanged), hashes pinned. Recorded as Addition 10(j); pushed `b47c95e` (CI green)
+before the run started at 10:11 EST.
+
+## 2026-11-12 — Milestone 16: results and post-run review
+
+Run complete (10:11–11:29 EST, 1 h 18 min, 4 cores at nice 10, within the 2 h limit). Frozen
+rules applied unchanged; classification in `docs/EVIDENCE_STATUS.md`. **Codex post-run review
+(m-42681ae26bbd / m-69ed73004aaa):** classifications match the frozen rules; one MAJOR on
+wording: CC's pass and lockbox p = 0.89 support "conditional coverage not rejected", not
+"calibration confirmed". **Action:** EVIDENCE_STATUS, RESULTS_LOG and REPORT wording use
+"not rejected"; low power with ≈ 10 hits noted. A post-hoc MCS sanity check (not frozen) is
+labelled informational everywhere. No method was modified after the results.
