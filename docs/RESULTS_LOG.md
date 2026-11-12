@@ -768,7 +768,9 @@ commit `b47c95e`). R = 2,000, seed 20261112, T = 6,535 and 961, 4 low-priority c
   5%; no result in up to 37% of samples with ≈ 10 hits). **Z2:** unsupported (14–31% when
   volatility dynamics are misspecified).
 - **Effect on the report:** every "significantly" based on DM, MCS or the H3 regression
-  becomes descriptive. FHS-GJR's coverage results stand ("not rejected", not "confirmed");
-  DQ's rejections stand at 2.5% and 5%; the lockbox "NOT REPLICATED" verdict is unchanged
+  becomes descriptive. FHS-GJR's VaR conditional-coverage null is not rejected, and CC meets
+  the size criterion (sparse-hit power limits; not a confirmation of calibration). At 5% DQ
+  rejects all 11 models on P1 and P2 and 10 of 11 on P3 (FHS-GJR not rejected); its 1%
+  rejections are descriptive; the lockbox "NOT REPLICATED" verdict is unchanged
   (it fails on mean-FZ0 ordering alone). Codex post-run review: classifications match the
   frozen rules.

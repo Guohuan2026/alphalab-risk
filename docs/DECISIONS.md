@@ -179,3 +179,14 @@ wording: CC's pass and lockbox p = 0.89 support "conditional coverage not reject
 "calibration confirmed". **Action:** EVIDENCE_STATUS, RESULTS_LOG and REPORT wording use
 "not rejected"; low power with ≈ 10 hits noted. A post-hoc MCS sanity check (not frozen) is
 labelled informational everywhere. No method was modified after the results.
+
+**Codex post-run review, full text (m-69ed73004aaa):** classifications confirmed (including
+the three surviving McNeil–Frey cells and POF T = 6,535 α 1% passing exactly at 6.4%). MAJOR:
+the FHS-GJR headline must read "VaR conditional-coverage null not rejected; CC meets the
+simulated size criterion, with sparse-hit power limitations", not confirmed or best
+calibration. MINORs: the LRV ratios are unit-calm-variance AR calculations, distinct from the
+finite-lag matched estimates, and Dmid shows vulnerability, not the actual series'
+distortion; the MCS sanity runs are post-hoc diagnostics; explain that SUPPORTED is
+size-only and marginal per test; verify each asserted DQ rejection. **Action:** all applied in
+EVIDENCE_STATUS and RESULTS_LOG. The DQ check against saved results showed FHS-GJR is *not*
+rejected on P3 at 2.5% or 5%, so "DQ rejects every model" is restated per portfolio.

@@ -44,22 +44,32 @@ gated design. Full tables: `data/results/calibration/{diff,es}_reps2000_seed2026
 | Bayer–Dimitriadis ESR | — | — | **D — retired** (amendment 11) |
 
 Reading the table:
+- **What "supported" means**: size within the frozen tolerance in every gated design for that
+  test, length and α, i.e. size control within the simulated envelope. It says nothing about
+  power, and each test is gated separately, so CC can pass where IND fails (T = 961, α 5%).
 - **Sanity designs pass**: with i.i.d. normal or t(3) differentials DM is 4.1–5.1% and H3
-  5.2–6.0%, and a post-hoc check (not frozen; informational) gave the MCS code 11.7% (i.i.d.)
-  and 8.3% (stochastic volatility and stress, no persistent mean) at its 10% level. The
-  failures are therefore caused by dependence, not by the code.
+  5.2–6.0% (frozen designs). Two post-hoc MCS runs (not frozen, outside every decision;
+  R = 300) gave 11.7% (11 i.i.d. models) and 8.3% (stochastic volatility and stress, no
+  persistent mean) at the 10% level. This is consistent with the persistent component
+  driving the distortion in these designs; it is a diagnostic check, not a full
+  verification of the implementation.
 - **Why DM, H3 and MCS fail**: the designs add a slowly mean-reverting component to the loss
   differential, matched to the real FZ0 series' autocorrelation and lag-10 / lag-100
   long-run-variance ratios. A Newey–West lag of 6–10 cannot capture it. Even **Dmid**,
   matched to the *median* real targets, gives DM 13.9–16.7%, H3 9.3–11.4% and MCS
-  39–53% false exclusions. The stronger designs imply a true long-run-variance ratio of
-  about 15–17, which the data cannot confirm or rule out beyond lag 100: the exact size of
-  the over-rejection is uncertain, its direction is not.
+  39–53% false exclusions. The matching used finite-lag *estimates* (lag 10 and lag 100).
+  The untruncated dependence the designs imply is larger: for the AR components alone, with
+  calm-period innovation variance normalised to 1 and ignoring the stress multiplier and
+  the volatility normalisation, the long-run-to-variance ratio is about 2.9 (Dmid), 16.8
+  (Dhigh) and 14.7 (Dhigh2). The sample cannot identify persistence beyond lag 100. So the
+  results show that these tests are vulnerable under DGPs that match the observed
+  statistics, including a median-matched one; they do not establish the same distortion
+  in the actual series.
 - **Coverage and DQ**: rates are for correct forecasts (designs A and C). In the
   missed-volatility designs B1/B2 these tests reject 17–100%, which is correct power, not
   size distortion: clustered hits are their alternative.
 - **Sparse hits (T = 961, α = 1%, ≈ 10 expected hits)**: POF rejects every sample with 0–4
-  hits by construction; CC is conservative (3.6%); McNeil–Frey gives no result in up to a
+  hits by construction; CC (3.6%) and IND (1.2%) are conservative; McNeil–Frey gives no result in up to a
   third of samples; DQ over-rejects (11%).
 
 ## Test by test
@@ -84,9 +94,9 @@ Reading the table:
 
 | Finding (REPORT.md) | Rests on | Status after calibration |
 |---|---|---|
-| FHS-GJR is the best-calibrated model: passes Kupiec and Christoffersen in every development cell; in the lockbox its conditional coverage is not rejected (P1 CC p = 0.89 / 0.37 / 0.63) | CC (A), POF/IND mostly A; hit rates (B) | **Stands as "not rejected"**, never as "calibration confirmed": a non-rejection with ≈ 10 expected hits at 1% has limited power. The 1% POF and 5% IND tests at lockbox length are over-sized (size, not power), so their non-rejections are not weakened by that distortion. |
+| FHS-GJR is the best-calibrated model: passes Kupiec and Christoffersen in every development cell; in the lockbox its conditional coverage is not rejected (P1 CC p = 0.89 / 0.37 / 0.63) | CC (A), POF/IND mostly A; hit rates (B) | **Restated:** FHS-GJR's VaR conditional-coverage null is not rejected; CC meets the simulated size criterion, with sparse-hit power limitations (≈ 10 expected hits at 1% in the lockbox). This does not confirm correct calibration, ES adequacy, or superiority over other models; "best-calibrated" is a descriptive summary (it is the only model never rejected), not a test result. |
 | ML models fail coverage (H1 not supported for ML) | CC/POF (A) | **Stands** (development cells; T = 6,535 is calibrated at every α). |
-| DQ rejects every model, including FHS-GJR on P1 (p = 0.019, 0.002, 0.011) | DQ | **Stands at 2.5% and 5%** (p = 0.002, 0.011); the 1% rejections are descriptive. |
+| DQ rejects every model, including FHS-GJR on P1 (p = 0.019, 0.002, 0.011) | DQ | **Restated per portfolio:** at 5% DQ rejects all 11 models on P1 and P2 and 10 of 11 on P3 (FHS-GJR not rejected, p = 0.43), checked against the saved `backtest_dq.csv`. P1 (T = 6,535) is calibrated at 2.5% and 5%, so FHS-GJR's P1 rejections there (p = 0.002, 0.011) stand. P2/P3 (T = 4,142 / 4,838) lie between the simulated lengths: 5% passed at both, 2.5% only at T = 6,535. All 1% rejections are descriptive. |
 | Ranking by mean FZ0; "ML does not beat FHS-GJR" (development); lockbox reversal | Mean losses, ranks (B) | **Descriptive facts.** "Lower average loss" is safe; every "significantly" from DM is withdrawn. |
 | DM significance (FHS-GJR beats QRF and GBQ; control vs FHS-GJR at 2.5% in the lockbox, p = 0.037; P2 hybrid p = 0.011) and MCS membership | DM, MCS (D) | **Withdrawn as inference**; reported as descriptive. |
 | Pre-stated lockbox rule "NOT REPLICATED" | Mean-FZ0 ordering (B) and MCS membership (D) | **Unchanged**: the rule fails on its descriptive half (GBQ has lower mean FZ0 in all three portfolios), whatever the MCS does. |
