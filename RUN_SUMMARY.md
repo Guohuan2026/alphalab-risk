@@ -1,5 +1,11 @@
 # Autonomous run summary — 2026-11-11
 
+> **Historical record (kept for transparency).** This is the log of one AI-assisted
+> development session. Its open issues are superseded: the `esr-robust-start` commits were
+> merged into `alphalab-risk`, and ESR inference was retired to descriptive status by
+> Addition 9, amendment 11 (owner-approved). Current status: `docs/EVIDENCE_STATUS.md`;
+> process: README, "Development process".
+
 Run window: start 18:16:02 EST, hard stop 20:16 EST (CLAUDE.md "Autonomous run rules").
 Branch `esr-robust-start` (local commits only; see Open issues). Everything here is
 **EXPLORATORY: development sample, added after the lockbox was opened; none of it is

@@ -10,8 +10,8 @@ with a pre-registered design, a once-only held-out test and calibrated backtests
 (for example 1 day in 100); *Expected Shortfall (ES)* is the average loss on those bad days.
 
 MSc Finance research project (HEC Montréal, supervised-project pathway) by Guohuan Yu.
-**Research report: [docs/REPORT.md](docs/REPORT.md)** (draft v2; a PDF version is proposed as an
-asset of the v1.0 release).
+**Research report: [docs/REPORT.md](docs/REPORT.md)** (draft v2; PDF:
+[docs/AlphaLab-Risk_Report.pdf](docs/AlphaLab-Risk_Report.pdf)).
 
 ---
 
@@ -163,13 +163,18 @@ tests), Stress (breach rates by regime, reaction speed after large losses), Expl
 (permutation importance, SHAP over time), Lockbox (development vs held-out), About. It never
 fits a model. Without saved results it explains how to produce them.
 
-<!-- Screenshots: add docs/images/dashboard_overview.png, dashboard_stress.png and
-dashboard_lockbox.png (binary files are outside the automated publish workflow), then
-uncomment:
-![Overview](docs/images/dashboard_overview.png)
-![Stress](docs/images/dashboard_stress.png)
-![Lockbox](docs/images/dashboard_lockbox.png)
--->
+**Overview** (P1 SPY, development sample, VaR 97.5%):
+
+![Dashboard overview: FZ0 loss ranking of the 11 models](docs/images/dashboard_overview.png)
+
+**Stress**: breach rates by market regime and reaction speed after large losses, with the
+evidence status of each statistic:
+
+![Dashboard stress tab](docs/images/dashboard_stress.png)
+
+**Lockbox**: development vs held-out ranking and the pre-stated replication verdict:
+
+![Dashboard lockbox tab](docs/images/dashboard_lockbox.png)
 
 ## Skills demonstrated
 
@@ -209,5 +214,6 @@ used for implementation, checking and review, as recorded in the commit history 
 
 ## Licence
 
-No licence has been chosen yet, so all rights are reserved by the author. Market data are not
-included in this repository (see [docs/DATA.md](docs/DATA.md)).
+Code and documentation: [MIT License](LICENSE), © 2026 Guohuan Yu. The licence covers this
+repository's contents only. Market data are not included and are not covered by it: Yahoo
+Finance and FRED terms apply to any data you download (see [docs/DATA.md](docs/DATA.md)).

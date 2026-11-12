@@ -1,8 +1,7 @@
 # AlphaLab-Risk v1.0 (proposed release notes)
 
-*Draft for the owner's approval. Not tagged, not published; the repository is private. The
-Python package version stays `0.2.0.dev0` unless the owner approves a bump in
-`pyproject.toml` (outside the automated publish workflow).*
+*Prepared for the owner's approval. Not tagged, not published; the repository is private.
+Package version 1.0.0; MIT License.*
 
 AlphaLab-Risk compares eleven econometric and machine-learning models for one-day portfolio
 Value-at-Risk and Expected Shortfall on three portfolios (SPY, a 60/40 ETF portfolio and
@@ -11,7 +10,7 @@ simulation study of how reliable each backtest is on data like these.
 
 ## Highlights
 
-- **Research report v2** (`docs/REPORT.md`; PDF attached): every claim labelled
+- **Research report v2** (`docs/REPORT.md`; PDF `docs/AlphaLab-Risk_Report.pdf`): every claim labelled
   [Inference], [Descriptive], [Exploratory] or [Unsupported test].
 - **Main results:**
   - The ML models' VaR forecasts fail Christoffersen's conditional-coverage test in 11–12 of
@@ -30,8 +29,11 @@ simulation study of how reliable each backtest is on data like these.
 
 ## Assets
 
-- `AlphaLab-Risk_Report_v2.pdf`: the research report.
-- Source code (automatic GitHub archive). No market data are included (`docs/DATA.md`).
+- `docs/AlphaLab-Risk_Report.pdf` (in the repository; can also be attached to the GitHub
+  release): the research report.
+- Dashboard screenshots: `docs/images/`.
+- Source code (automatic GitHub archive), MIT License. No market data are included
+  (`docs/DATA.md`); the licence does not cover third-party data.
 
 ## Known limitations
 

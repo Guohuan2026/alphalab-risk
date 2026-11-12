@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alphalab"
-version = "0.2.0.dev0"
+version = "1.0.0"
 description = "AlphaLab-Risk: machine learning for portfolio risk forecasting and stress resilience"
 readme = "README.md"
 requires-python = ">=3.11"

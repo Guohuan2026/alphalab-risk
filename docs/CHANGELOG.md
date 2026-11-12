@@ -3,9 +3,14 @@
 Dates are those of the commits. Research results are logged in full, in the order they were
 seen, in `RESULTS_LOG.md`; this file summarises versions.
 
-## v1.0.0 (proposed; not yet tagged)
+## v1.0.0 (prepared; not yet tagged)
 
-Portfolio release candidate (Milestone 18).
+Portfolio release candidate (Milestone 18). Package version 1.0.0 (was 0.2.0.dev0).
+
+- **MIT License** added (code and documentation; third-party data excluded).
+- **Report PDF** (`docs/AlphaLab-Risk_Report.pdf`) and dashboard screenshots
+  (`docs/images/`) committed.
+- **`RUN_SUMMARY.md`** marked as a historical log; its open issues are superseded.
 
 - **Report v2** (`REPORT.md`, 2026-11-12): every claim labelled by evidence strength;
   significance claims based on Diebold–Mariano, MCS and the stress regression withdrawn;

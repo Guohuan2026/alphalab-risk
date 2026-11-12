@@ -219,3 +219,16 @@ definition; newest lockbox screenshot. **Action:** all applied (render-completio
 tests; claims narrowed; screenshot retaken). **Public release: NO-GO** until the owner
 decides on the privacy items (author email in commit metadata; tracked internal workflow
 notes) and the final-tree fresh-clone check is logged.
+
+## 2026-11-12 — Owner decisions for v1.0.0 preparation
+
+The owner (1) accepted that their email address stays public in the commit metadata, and
+instructed that history and pre-registration records be preserved (no rewrite); (2) chose
+the MIT License; (3) approved committing the report PDF and dashboard screenshots and bumping
+the package version to 1.0.0; (4) asked for a review of the internal workflow files. Review
+outcome: `CLAUDE.md` (working instructions for the coding assistant) contains no secrets and
+is consistent with the README's AI-assistance disclosure, so it is kept unchanged.
+`RUN_SUMMARY.md` is kept as a historical record with a banner marking its open issues
+superseded. Because these files are outside the automated publish workflow (root files,
+binaries, `pyproject.toml`), the owner commits them. Merge to main, the release tag and the
+visibility change still await the owner's explicit approval.
