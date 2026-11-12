@@ -807,3 +807,8 @@ environment (uv, Python 3.12.14) with `requirements-lock.txt` only. Results:
    results.**
 3. Not executed: the live Yahoo download steps of `scripts/setup_mac.sh` (live downloads need
    the owner's approval).
+
+**Final-tree check (same day).** Fresh clone of `alphalab-risk` at `1219513` (CI run
+43276195998: success), new uv environment with `requirements-lock.txt`: lint and format clean,
+**341 of 341 offline tests passed**, `make synthetic` (ingest + build) completed, and the
+dashboard launched and showed its "no results found" guidance (no saved results in a clone).

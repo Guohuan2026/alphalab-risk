@@ -12,7 +12,7 @@ Portfolio release candidate (Milestone 18).
   figures; PDF export (`python -m alphalab.report_pdf`).
 - **Backtest calibration study** (Milestone 16, RESEARCH_DESIGN Addition 10): frozen size
   simulations; DM, MCS, stress regression, Z2 and most McNeil–Frey cells unsupported;
-  Christoffersen CC supported everywhere. Classification in `EVIDENCE_STATUS.md`.
+  Christoffersen CC supported in every simulated design (P2/P3 lengths provisional). Classification in `EVIDENCE_STATUS.md`.
 - **ES regression backtest retired** (Addition 9, amendments 1–11): esreg port validated, but
   the bootstrap failed its size check under dependence; estimates kept as diagnostics.
 - **Dashboard**: evidence-status notes next to every p-value and on the lockbox verdict.
