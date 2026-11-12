@@ -742,3 +742,57 @@ Format: date · section · change · reason · made before/after seeing affected
      dependence-robust calibration, retired). The P1 lasso QR ESR quarantine continues
      (degenerate covariance: even its descriptive ESR statistics are blank); it concerns
      ESR only.
+10. **2026-11-12 · §7 · Addition (not pre-registered): Milestone 16, finite-sample calibration
+    of the backtests.** EXPLORATORY: written after the lockbox was opened; simulated data
+    only (real development series set the simulation parameters; the lockbox is not used).
+    Frozen before any calibration result existed; code `backtest/calibration.py`.
+    (a) *Question:* do the backtests' p-values reject a true null at about their nominal rate
+    under the dependence, heavy tails, volatility clustering and stress persistence of these
+    data, at the real sample sizes (P1 development T = 6,535; lockbox T = 961)?
+    (b) *Loss-differential tests* (Diebold–Mariano, H3 stress-dummy HAC regression, MCS), run
+    exactly as in `compare.py` / `stress/analysis.py`. Null: equal expected loss. Differential
+    d_t = μ_t + s_t·σ_t·ε_t: ε standardised Student-t(3); σ log-AR(1) SV (φ 0.98, τ 0.15);
+    s_t = 2 on the real P1 episode calendar (Clarification 4; the T = 961 designs use its last
+    961 days), else 1; μ_t a zero-mean AR(1) with persistence φ_μ and variance share w,
+    independent of the stress calendar (so the H3 null b = 0 holds). Parameters matched to
+    the real P1 FZ0 differentials vs FHS-GJR (30 pairs) by acf(1) and Newey–West long-run /
+    variance ratios at the default lag and at lag 100, using only those statistics (no test
+    was run): **Dmid** φ_μ 0.95, w 0.05 (median pair: lag-100 ratio 1.92 vs real 1.88);
+    **Dhigh** φ_μ 0.99, w 0.08 (90th percentile, the ML-vs-FHS-GJR range: 4.34 vs 4.54; the
+    less persistent of two near-equal fits). Both under-match the real default-lag ratio
+    (1.25–1.45 vs 1.41–1.87), i.e. the designs are, if anything, lenient. Sanity designs:
+    **D0n** i.i.d. normal, **D0t** i.i.d. t(3). MCS: 11 models with independent zero-mean
+    deviations sharing σ_t, in Dmid and Dhigh; a size error = any model excluded from the
+    90% MCS.
+    (c) *ES and coverage tests* (McNeil–Frey raw and standardised, Z2, Kupiec POF,
+    Christoffersen IND and CC, DQ), run exactly as in `es.py` / `coverage.py` on exact
+    forecasts, α = 1%, 2.5%, 5%. Designs: **A** (SV, t5, forecasts fully correct), **B1/B2**
+    (a missed persistent volatility component; forecasts correct given the forecaster's
+    information; hits cluster; as in the ESR size simulation), **C** (Gaussian scale mixture,
+    10% of shocks with 3× sd: a tail shape that is not Student-t). The McNeil–Frey and Z2 nulls
+    hold in A, B1, B2 and C. The coverage/DQ null (i.i.d. Bernoulli hits) holds in A and C
+    only; B1/B2 are reported for them as power, and for POF as "rate-only reading under
+    clustering" (not gated).
+    (d) *Replications and seeds:* R = 2,000 per cell, seed 20261112, per-replication
+    SeedSequence from (family, design, T, replication); bootstrap/Monte Carlo seeds inside
+    the tests as in the pipeline (MCS 2,000 reps; McNeil–Frey and Z2 10,000).
+    (e) *Acceptance (same rule as amendment 6, not revisited after results):* a cell passes
+    if its rejection rate at the nominal level is ≤ 6.4% (5% tests) or ≤ 11.9% (the 90% MCS),
+    i.e. nominal + 2 binomial sd at R = 1,000; Wilson 95% intervals reported.
+    Under-rejection is reported but does not fail.
+    (f) *Failure handling:* a NaN p-value (test not computable, e.g. McNeil–Frey with < 5
+    hits) counts as a non-rejection and is reported; a cell with > 5% NaN is UNAVAILABLE
+    (counts as not passing). Incomplete cells do not pass.
+    (g) *Decisions:* per test, per domain (T = 6,535 development; T = 961 lockbox) and per α
+    where applicable: SUPPORTED if every gated design passes; otherwise UNSUPPORTED. One
+    fallback per test is pre-declared and computed in the same run, adopted only where the
+    primary is UNSUPPORTED and the fallback passes every gated design: DM and H3, fixed-b
+    inference (Bartlett, bandwidth 0.1·T, Kiefer–Vogelsang 2005 critical value); MCS, block
+    length 40. Coverage and DQ: if a χ² version fails, Monte Carlo p-values under i.i.d.
+    Bernoulli hits (Dufour 2006) are exact by construction for that null; that remedy needs
+    implementing in the pipeline and is recommended, not simulated. McNeil–Frey and Z2 have
+    no fallback. An UNSUPPORTED test's real-data p-values become descriptive in
+    `docs/EVIDENCE_STATUS.md`; no test is modified to obtain a pass.
+    (h) *Cost:* about 3.3 CPU-hours, ≈ 1.1 h on 4 low-priority cores (measured).
+    (i) *Review:* Codex reviews this design before the run and the results after it. Changes
+    from the pre-run review are logged with their reason; none after results.
