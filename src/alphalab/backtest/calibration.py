@@ -57,6 +57,8 @@ class DiffDesign:
     sv: bool = True  # stochastic volatility
     stress: bool = True  # stress multiplier on the real episode calendar
     nu: float = NU_D  # inf = normal shocks
+    phi2: float = 0.0  # optional second (medium-memory) zero-mean component
+    w2: float = 0.0
 
 
 def t_std(nu: float, size, rng: np.random.Generator) -> np.ndarray:
@@ -86,8 +88,10 @@ def sim_diff(d: DiffDesign, stress: np.ndarray, rng: np.random.Generator, k: int
     s = np.where(stress, STRESS_MULT, 1.0) if d.stress else np.ones(n)
     out = np.empty((n, k))
     for j in range(k):
-        e = t_std(d.nu, n, rng) * np.sqrt(1 - d.w)
+        e = t_std(d.nu, n, rng) * np.sqrt(1 - d.w - d.w2)
         mu = np.sqrt(d.w) * _ar1(d.phi_mu, n, rng) if d.w > 0 else 0.0
+        if d.w2 > 0:
+            mu = mu + np.sqrt(d.w2) * _ar1(d.phi2, n, rng)
         out[:, j] = mu + s * sig * e
     return out
 
@@ -119,8 +123,11 @@ DIFF_DESIGNS = (
     DiffDesign("D0t_iid_t3", sv=False, stress=False),
     DiffDesign("Dmid", phi_mu=0.95, w=0.05),
     DiffDesign("Dhigh", phi_mu=0.99, w=0.08),
+    # Codex pre-run review: Dhigh under-matches the upper default-lag ratio; Dhigh2 matches
+    # both upper targets (default lag 1.83 vs 1.87; lag 100 4.84 vs 4.54; acf1 0.10 > 0.045)
+    DiffDesign("Dhigh2", phi_mu=0.99, w=0.06, phi2=0.9, w2=0.10),
 )
-MCS_DESIGNS = ("Dmid", "Dhigh")
+MCS_DESIGNS = ("Dmid", "Dhigh", "Dhigh2")
 K_MODELS = 11
 FIXED_B = 0.1
 
@@ -326,14 +333,17 @@ def _job(args) -> tuple[str, float]:
 def run(root: Path, s: CalSettings, stress_p1: np.ndarray, log_path: Path | None = None) -> dict:
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
+    designs = DIFF_DESIGNS if s.family == "diff" else ES_DESIGNS
     doc = asdict(s) | {
         "seed": SEED,
-        "stress_days": int(np.sum(stress_p1)),
+        "designs": [asdict(x) for x in designs],
+        "stress_sha256": hashlib.sha256(np.asarray(stress_p1, bool).tobytes()).hexdigest(),
         "n_stress": len(stress_p1),
+        "code_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
     }
     mpath = root / "settings.json"
     if mpath.exists() and json.loads(mpath.read_text()) != json.loads(json.dumps(doc)):
-        raise RuntimeError(f"{root}: existing run used other settings; use a new folder")
+        raise RuntimeError(f"{root}: existing run used other settings or code; use a new folder")
     mpath.write_text(json.dumps(doc, indent=2))
     if log_path is not None:
         h = logging.FileHandler(log_path)
@@ -362,10 +372,11 @@ def run(root: Path, s: CalSettings, stress_p1: np.ndarray, log_path: Path | None
 # ------------------------------------------------------------------ frozen decision rules
 LEVEL = 0.05
 THRESH = {0.05: 0.064, 0.10: 0.119}  # nominal + 2 binomial sd at R = 1,000 (amendment 6 rule)
+STRICT = {0.05: 0.060, 0.10: 0.113}  # informational: nominal + 2 binomial sd at R = 2,000
 MAX_NAN = 0.05
 GATE_DESIGNS = {  # designs under which each test's null holds and is gated
-    "dm": ("D0n_iid_normal", "D0t_iid_t3", "Dmid", "Dhigh"),
-    "h3": ("D0n_iid_normal", "D0t_iid_t3", "Dmid", "Dhigh"),
+    "dm": ("D0n_iid_normal", "D0t_iid_t3", "Dmid", "Dhigh", "Dhigh2"),
+    "h3": ("D0n_iid_normal", "D0t_iid_t3", "Dmid", "Dhigh", "Dhigh2"),
     "mcs": MCS_DESIGNS,
     "mf_raw": ("A_correct", "B1_missed_vol_phi095", "B2_missed_vol_phi099", "C_mixture_tails"),
     "mf_std": ("A_correct", "B1_missed_vol_phi095", "B2_missed_vol_phi099", "C_mixture_tails"),
@@ -433,6 +444,14 @@ def cell_rates(root: Path, s: CalSettings) -> pd.DataFrame:
                     nominal = 0.10 if base == "mcs" else LEVEL
                     k, m = float(np.sum(rej.fillna(False))), len(rej)
                     rate = k / m if m else float("nan")
+                    ids = g.rep.to_numpy()
+                    complete = bool(
+                        len(ids) == s.reps
+                        and len(set(ids)) == len(ids)
+                        and set(ids) == set(range(s.reps))
+                    )
+                    fin = 1 - nan[t]
+                    rate_fin = k / (m * fin) if m and fin > 0 else float("nan")
                     lo, hi = _wilson(k, m)
                     status = (
                         "UNAVAILABLE"
@@ -448,7 +467,9 @@ def cell_rates(root: Path, s: CalSettings) -> pd.DataFrame:
                             "n": n,
                             "alpha": a,
                             "reps": m,
-                            "complete": m == s.reps,
+                            "complete": complete,
+                            "rate_finite": rate_fin,
+                            "above_strict": rate > STRICT[nominal],
                             "rate": rate,
                             "nominal": nominal,
                             "wilson_lo": lo,
@@ -471,7 +492,9 @@ def decisions(cells: pd.DataFrame) -> pd.DataFrame:
     g = cells[cells.gated]
     rows = []
     for (t, n, a), x in g.groupby(["test", "n", "alpha"], dropna=False):
-        ok = bool((x.status == "PASS").all() and x.complete.all())
+        base = t.replace("_fb", "").replace("_b40", "")
+        full_set = set(x.design) == set(GATE_DESIGNS[base]) and len(x) == len(GATE_DESIGNS[base])
+        ok = bool(full_set and (x.status == "PASS").all() and x.complete.all())
         rows.append(
             {
                 "test": t,
@@ -485,7 +508,10 @@ def decisions(cells: pd.DataFrame) -> pd.DataFrame:
     d = pd.DataFrame(rows)
     final = []
     for _, r in d[~d.test.str.contains("_fb|_b40")].iterrows():
-        fb = {"dm": "dm_fb", "h3": "h3_fb", "mcs": "mcs_b40"}.get(r.test)
+        # H3's fixed-b result is an empirical diagnostic only (Codex pre-run review: the
+        # Kiefer–Vogelsang conditions are not established for a persistent deterministic
+        # episode dummy with stress-dependent variance); it is never adopted.
+        fb = {"dm": "dm_fb", "mcs": "mcs_b40"}.get(r.test)
         verdict = "SUPPORTED" if r.supported else "UNSUPPORTED"
         if not r.supported and fb:
             f = d[
@@ -497,6 +523,26 @@ def decisions(cells: pd.DataFrame) -> pd.DataFrame:
                 verdict = f"SUPPORTED WITH FALLBACK ({fb})"
         final.append(r.to_dict() | {"decision": verdict})
     return pd.DataFrame(final)
+
+
+def hit_strata(root: Path, s: CalSettings, n: int = 961, alpha: float = 0.01) -> pd.DataFrame:
+    """Rejection rates by number of hits (lockbox length, 1%): where sparse hits bite."""
+    out = []
+    bins, labels = [-1, 4, 7, 10, 13, 1000], ["0-4", "5-7", "8-10", "11-13", "14+"]
+    for d in ES_DESIGNS:
+        df = _load(root, f"{d.name}_n{n}")
+        if df.empty:
+            continue
+        g = df[np.isclose(df.alpha, alpha)].copy()
+        g["hit_bin"] = pd.cut(g.hits, bins, labels=labels)
+        for b, x in g.groupby("hit_bin", observed=True):
+            row = {"design": d.name, "n": n, "alpha": alpha, "hits": str(b), "reps": len(x)}
+            for t in ("pof", "ind", "cc", "dq", "mf_raw", "mf_std", "z2"):
+                p = pd.to_numeric(x[f"{t}_p"], errors="coerce")
+                row[f"{t}_rej"] = float((p < LEVEL).mean())
+                row[f"{t}_nan"] = float(p.isna().mean())
+            out.append(row)
+    return pd.DataFrame(out)
 
 
 def stress_calendar_p1() -> np.ndarray:
@@ -533,6 +579,10 @@ def main(argv=None) -> int:
         cells.to_csv(root / "cells.csv", index=False)
         dec = decisions(cells)
         dec.to_csv(root / "decisions.csv", index=False)
+        if a.family == "es":
+            hs = hit_strata(root, s)
+            hs.to_csv(root / "hit_strata_n961_a1.csv", index=False)
+            print(hs.round(3).to_string(index=False))
         pd.set_option("display.width", 250)
         print(cells.round(4).to_string(index=False))
         print(dec.round(4).to_string(index=False))

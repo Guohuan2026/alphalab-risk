@@ -796,3 +796,26 @@ Format: date · section · change · reason · made before/after seeing affected
     (h) *Cost:* about 3.3 CPU-hours, ≈ 1.1 h on 4 low-priority cores (measured).
     (i) *Review:* Codex reviews this design before the run and the results after it. Changes
     from the pre-run review are logged with their reason; none after results.
+    (j) *Changes from Codex's pre-run review (2026-11-12 ~10:10 EST; no calibration result
+    existed):* (1) *Completeness:* a decision requires the exact set of gated designs and
+    replication IDs 0…R−1 without duplicates, for primary and fallback alike (regression
+    tests added). (2) *Dependence envelope:* Dhigh under-matched the upper default-lag ratio,
+    easing the HAC tests' main difficulty, so a gated design **Dhigh2** was added (φ_μ 0.99,
+    w 0.06, plus a medium-memory component φ₂ 0.9, w₂ 0.10; default-lag ratio 1.83 vs real
+    1.87, lag-100 ratio 4.84 vs 4.54, acf(1) 0.10 vs 0.045, i.e. stricter), matched on
+    statistics only; it is gated for DM, H3 and MCS. Any SUPPORTED verdict holds within the
+    simulated dependence envelope (D0–Dhigh2), not beyond it; MCS conclusions also assume
+    independent model deviations around a common volatility. (3) *H3 fixed-b:* the
+    Kiefer–Vogelsang conditions (assumptions 2–3) are not established for a persistent
+    deterministic episode dummy with stress-dependent variance, so H3's fixed-b result is
+    reported as an empirical diagnostic only and is **never adopted**; H3 is SUPPORTED only
+    if its primary test passes. DM's fixed-b fallback (critical value 2.2606 at b = 0.1,
+    checked) stays adoptable but, given the deterministic variance calendar, is labelled
+    empirical support within the simulated designs, not a theoretical guarantee.
+    (4) *Reporting (minor):* finite-only rejection rates beside the NaN-as-non-rejection
+    rates; hit-count strata at T = 961, α = 1%; an informational flag where a rate exceeds
+    nominal + 2 sd at R = 2,000 (6.0%; MCS 11.3%), the frozen 6.4% / 11.9% thresholds being
+    unchanged; checkpoints pin the designs, code hash and calendar hash. (5) *DQ remedy text:*
+    a Monte Carlo DQ p-value must rebuild the lagged-hit regressors in every draw and
+    conditions on the observed VaR path (valid under the null that hits are i.i.d. and
+    independent of past information including VaR). Revised cost ≈ 1.2 h on 4 cores.

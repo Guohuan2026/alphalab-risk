@@ -44,7 +44,7 @@ def test_replications_run_and_decisions_apply_frozen_rules(tmp_path):
     rows = cb.es_replication(cb.ES_DESIGNS[3], 961, 0)
     assert [x["alpha"] for x in rows] == list(cb.ALPHAS)
     s = cb.CalSettings("diff", reps=4, batch=4)
-    for name in ("Dmid", "Dhigh", "D0n_iid_normal", "D0t_iid_t3"):
+    for name in ("Dmid", "Dhigh", "Dhigh2", "D0n_iid_normal", "D0t_iid_t3"):
         (tmp_path / f"{name}_n961").mkdir()
         rej = name == "Dhigh"
         rows = [
@@ -66,3 +66,47 @@ def test_replications_run_and_decisions_apply_frozen_rules(tmp_path):
     assert dec.loc["h3", "decision"] == "SUPPORTED"
     assert dec.loc["mcs", "decision"] == "SUPPORTED"
     assert isinstance(cb.cell_rates(tmp_path, s), pd.DataFrame)
+
+
+def _write(tmp_path, names, rep_ids, rej_design=None):
+    for name in names:
+        (tmp_path / f"{name}_n961").mkdir(exist_ok=True)
+        rows = [
+            {
+                "rep": i,
+                "dm_p": 0.01 if name == rej_design else 0.5,
+                "dm_fb_rej": False,
+                "h3_p": 0.01 if name == rej_design else 0.5,
+                "h3_fb_rej": False,
+                "mcs_excl": 0,
+                "mcs_b40_excl": 0,
+            }
+            for i in rep_ids
+        ]
+        (tmp_path / f"{name}_n961" / "batch_0000.json").write_text(json.dumps(rows))
+
+
+def test_missing_gated_design_is_never_supported(tmp_path):
+    s = cb.CalSettings("diff", reps=4, batch=4, sizes=(961,))
+    _write(tmp_path, ["D0n_iid_normal", "D0t_iid_t3", "Dmid", "Dhigh"], range(4))  # no Dhigh2
+    dec = cb.decisions(cb.cell_rates(tmp_path, s)).set_index("test")
+    assert (
+        dec.loc["dm", "decision"] == "UNSUPPORTED" and dec.loc["mcs", "decision"] == "UNSUPPORTED"
+    )
+
+
+def test_duplicate_or_missing_replication_ids_are_incomplete(tmp_path):
+    s = cb.CalSettings("diff", reps=4, batch=4, sizes=(961,))
+    names = [d.name for d in cb.DIFF_DESIGNS]
+    _write(tmp_path, names, [0, 1, 2, 2])
+    cells = cb.cell_rates(tmp_path, s)
+    assert not cells.complete.any()
+    assert (cb.decisions(cells).decision == "UNSUPPORTED").all()
+
+
+def test_h3_fixed_b_is_never_adopted(tmp_path):
+    s = cb.CalSettings("diff", reps=4, batch=4, sizes=(961,))
+    _write(tmp_path, [d.name for d in cb.DIFF_DESIGNS], range(4), rej_design="Dhigh2")
+    dec = cb.decisions(cb.cell_rates(tmp_path, s)).set_index("test")
+    assert dec.loc["h3", "decision"] == "UNSUPPORTED"  # primary fails, fixed-b passes: not adopted
+    assert dec.loc["dm", "decision"] == "SUPPORTED WITH FALLBACK (dm_fb)"
