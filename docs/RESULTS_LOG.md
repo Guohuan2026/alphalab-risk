@@ -786,3 +786,24 @@ summaries were imprecise): FHS-GJR's conditional-coverage null **is rejected on 
 **not** reject FHS-GJR on P3 at any level; the RF-vol hybrid's day-after VaR rise is 38%, not
 in the 23–29% range of the other tree models; in the lockbox, FHS-GJR, gradient boosting,
 the RF-vol hybrid, the lasso control and HAR-FHS all have 0 of 9 CC rejections.
+
+---
+
+## 2026-11-12 — Clean-clone reproducibility re-check (Milestone 18)
+
+Fresh clone of `alphalab-risk` at `e349abd` from GitHub into an empty directory; new
+environment (uv, Python 3.12.14) with `requirements-lock.txt` only. Results:
+1. **Offline tests: 10 of 335 failed at first.** Cause: `streamlit.testing.AppTest` (in
+   `test_dashboard.py`) replaces `sys.modules["__main__"]` with the dashboard script; process
+   pools started later in the session (spawn start method) re-import `__main__` in every
+   worker, so each worker re-ran the dashboard, and without saved results it stopped and the
+   pool broke. Locally the saved results masked the defect. Fixed in the test (restore
+   `__main__`; regression test added): 336 of 336 then passed in the clone. Lint clean;
+   synthetic pipeline ran end to end. No research code or result was affected.
+2. **P1 rebuilt from the original raw snapshots** (prices `20261106T222941Z_e325d363`,
+   features `20261106T222947Z_d0d2e72e`; development sample only, lockbox not run) with
+   `alphalab build`, `forecast` and `backtest` (15.5 min): **all 11 models' 71,885 forecasts
+   and the coverage, loss, DM and ES backtest tables are byte-identical to the logged
+   results.**
+3. Not executed: the live Yahoo download steps of `scripts/setup_mac.sh` (live downloads need
+   the owner's approval).

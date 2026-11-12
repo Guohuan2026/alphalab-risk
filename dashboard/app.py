@@ -281,6 +281,12 @@ with tabs[2]:
             hide_index=True,
             width="stretch",
         )
+        st.caption(
+            "CC p is supported inference at every level. For lockbox-length samples (≈ 960 days) "
+            "Kupiec at 1% and Independence at 5% are over-sized; Kupiec also over-rejects when "
+            "breaches cluster. DQ p at 1% is descriptive (over-sized); at 2.5% it is supported only "
+            "for the long P1 samples (Milestone 16 calibration; docs/EVIDENCE_STATUS.md)."
+        )
         if dq is None and lockbox:
             st.caption("DQ test: development samples only (added after the lockbox was opened).")
         if es is not None:
@@ -488,8 +494,9 @@ with tabs[3]:
                 width="stretch",
             )
             st.caption(
-                "Positive = worse than FHS-GJR. A non-significant b is not proof of no stress effect: FZ0 is "
-                "noisy on volatile days (see METHODOLOGY §14)."
+                "Positive = worse than FHS-GJR. The coefficients a and b are descriptive. Their p-values are "
+                "not supported: this HAC regression over-rejected at 9–30% (nominal 5%) in a size check "
+                "with persistent loss differentials (Milestone 16 calibration; docs/EVIDENCE_STATUS.md)."
             )
         if ev is not None:
             st.subheader(
@@ -595,8 +602,9 @@ with tabs[5]:
     else:
         st.error(
             "**Not replicated** by the pre-stated rule (protocol pushed before the run): in the calm "
-            "2023–26 period, feature-based models had lower mean FZ0 than FHS-GJR. On SPY the differences "
-            "are not significant; FHS-GJR stayed well calibrated.",
+            "2023–26 period, gradient boosting had lower mean FZ0 than FHS-GJR in every portfolio and "
+            "level. This is a descriptive criterion: no supported test assesses these small differences. "
+            "FHS-GJR's conditional-coverage null was not rejected, as for several other models.",
             icon="⚠️",
         )
         comp = dev_h[dev_h.alpha == alpha][["label", "rank_fz0", "hit_rate"]].merge(
@@ -645,7 +653,7 @@ with tabs[5]:
                 delta_color="off",
             )
             st.caption(
-                "The calm-regime explanation was formed after seeing the lockbox result: post hoc, untested."
+                "The calm-regime explanation was formed after seeing the lockbox result: post hoc, untested. MCS membership is descriptive only (the MCS failed its size check; docs/EVIDENCE_STATUS.md)."
             )
 
 # ---------------------------------------------------------------- about

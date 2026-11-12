@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -67,6 +68,10 @@ def _app(data_dir, monkeypatch):
     from streamlit.testing.v1 import AppTest
 
     monkeypatch.setenv("ALPHALAB_DATA_DIR", str(data_dir))
+    # AppTest replaces sys.modules["__main__"] with the app script. Process pools started
+    # later in the same session (spawn start method) re-import __main__ in every worker, so
+    # they would re-run the dashboard and, without saved results, die. Restore it on teardown.
+    monkeypatch.setitem(sys.modules, "__main__", sys.modules["__main__"])
     return AppTest.from_file(APP, default_timeout=60)
 
 
@@ -90,3 +95,10 @@ def test_app_without_results_explains_what_to_do(tmp_path, monkeypatch):
     at = _app(tmp_path, monkeypatch).run()
     assert not at.exception
     assert any("No results found" in i.value for i in at.info)
+
+
+def test_app_test_does_not_leak_main_module(tmp_path, monkeypatch):
+    main = sys.modules["__main__"]
+    with monkeypatch.context() as m:
+        _app(tmp_path, m).run()
+    assert sys.modules["__main__"] is main

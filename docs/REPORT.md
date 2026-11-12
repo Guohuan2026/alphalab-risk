@@ -1,7 +1,7 @@
 # AlphaLab-Risk: Machine Learning for Portfolio Risk Forecasting and Stress Resilience
 
-**Research report, draft v2 (2026-11-12)** · supersedes draft v1 (2026-11-07)
-Guohuan Yu, MSc Finance (supervised-project pathway), HEC Montréal
+**Research report, draft v2 (2026-11-12)** · supersedes draft v1 (2026-11-07)\
+Guohuan Yu, MSc Finance (supervised-project pathway), HEC Montréal\
 Code, data provenance and full history: `github.com/Guohuan2026/alphalab-risk` (private),
 branch `alphalab-risk`. Every number below was re-checked against the saved result files
 (`data/results/`) for this draft; the log of results in the order they were seen is
@@ -26,8 +26,9 @@ Can machine-learning (ML) models forecast portfolio downside risk better than th
 econometric methods used by banks and asset managers, particularly during market stress? I
 compare eleven one-day Value-at-Risk (VaR) and Expected Shortfall (ES) models on US equity
 (SPY, the headline portfolio), a 60/40 multi-asset portfolio and Canadian equity (XIU.TO),
-using strictly out-of-sample walk-forward forecasts, a design frozen before any model result
-existed, and a 2023–2026 lockbox opened exactly once. In the 1997–2022 development sample,
+using strictly out-of-sample walk-forward forecasts, a design frozen before any GARCH, ML or
+lockbox result existed (only baseline historical-simulation and EWMA results had been seen),
+and a 2023–2026 lockbox opened exactly once. In the 1997–2022 development sample,
 the ML models' VaR forecasts were rejected by Christoffersen's conditional-coverage test in
 11 or 12 of 12 portfolio × level cells, while the conditional-coverage null for filtered
 historical simulation with GJR-GARCH volatility (FHS-GJR) was not rejected in 11 of 12
@@ -373,19 +374,20 @@ leaves. FHS-GJR moved from 4.12% to 11.73%. A tree cannot forecast a risk level 
 training range; GARCH extrapolates through its recursion.
 
 ```mermaid
+%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#1f4e9e, #d9822b, #3a9b5c"}}}}%%
 xychart-beta
     title "Figure 1. P1 one-day 99% VaR, weekly, Aug 2008 - Jan 2009 (% of portfolio)"
-    x-axis ["Aug 1", "Aug 8", "Aug 15", "Aug 22", "Aug 29", "Sep 5", "Sep 12", "Sep 19", "Sep 26", "Oct 3", "Oct 10", "Oct 17", "Oct 24", "Oct 31", "Nov 7", "Nov 14", "Nov 21", "Nov 28", "Dec 5", "Dec 12", "Dec 19", "Dec 26", "Jan 2", "Jan 9", "Jan 16", "Jan 23", "Jan 30"]
+    x-axis ["Aug", "·", "··", "···", "····", "Sep", "˙", "˙˙", "˙˙˙", "Oct", "-", "--", "---", "----", "Nov", "‐", "‐‐", "‐‐‐", "Dec", "‒", "‒‒", "‒‒‒", "Jan", "–", "––", "–––", "––––"]
     y-axis "1% VaR (%)" 0 --> 14
     line [3.4, 3.3, 3.0, 2.9, 3.1, 3.9, 4.1, 6.5, 6.1, 8.9, 11.7, 13.1, 13.3, 11.4, 11.4, 11.7, 13.3, 11.4, 12.1, 10.4, 8.8, 7.7, 6.6, 6.5, 6.4, 7.2, 7.0]
     line [3.6, 3.3, 2.8, 2.7, 2.9, 3.7, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 3.8, 10.1, 8.6]
     line [2.6, 2.8, 2.8, 2.2, 2.6, 2.9, 3.3, 3.6, 3.3, 3.3, 3.2, 3.2, 3.2, 3.2, 3.5, 3.2, 3.2, 3.0, 3.2, 3.2, 3.3, 3.5, 3.6, 3.5, 3.7, 8.9, 7.2]
 ```
 
-*Figure 1.* Rising line: FHS-GJR. Flat line at 3.8%: RF-vol + FHS hybrid. Lowest line:
-quantile forest. VIX rose from 25.7 (12 Sep) to 79.1 (24 Oct). The forest-based forecasts
+*Figure 1.* Blue (rising): FHS-GJR. Orange (flat at 3.8%): RF-vol + FHS hybrid. Green
+(lowest): quantile forest. Ticks are Friday values; month names mark each month's first week. VIX rose from 25.7 (12 Sep) to 79.1 (24 Oct). The forest-based forecasts
 stay capped until their scheduled yearly refit in January 2009, when the training data first
-include autumn 2008. Source: `forecasts.parquet` (P1 development run), Friday values.
+include autumn 2008. Source: `forecasts.parquet` (P1 development run).
 
 ### 5.5 Robustness [Descriptive]
 
@@ -491,6 +493,7 @@ and stricter completeness rules; a review after the run confirmed the classifica
 | Acerbi–Székely Z2 | 13.6–30.7% | 13.6–26.5% | Unsupported |
 
 ```mermaid
+%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#1f4e9e, #c0392b"}}}}%%
 xychart-beta
     title "Figure 2. Worst false-rejection rate at nominal 5% (bars) vs 6.4% limit (line)"
     x-axis ["CC", "POF", "IND", "DQ", "McNeil-Frey", "Z2", "HAC regr.", "DM"]
@@ -499,7 +502,7 @@ xychart-beta
     line [6.4, 6.4, 6.4, 6.4, 6.4, 6.4, 6.4, 6.4]
 ```
 
-*Figure 2.* Worst rate over designs, sample lengths and levels; the MCS (false exclusion up
+*Figure 2.* Blue bars: worst rate over designs, sample lengths and levels; red line: the 6.4% limit. The MCS (false exclusion up
 to 99% at a 10% nominal level) is off this scale.
 
 **Interpretation.** With independent differentials, DM (4–5%) and the regression (5–6%) are
@@ -622,7 +625,8 @@ pre-specified validation) maps onto model-validation documentation standards.
   1.5.0 changes forest quantiles).
 - **Verification:** a fresh clone with the one-command setup passed the test suite at the time
   (254 tests) and rebuilt all 11 models' P1 forecasts and backtest tables bit-for-bit. The
-  current suite (335 tests) passes in continuous integration.
+  current suite passes in continuous integration; each fresh-clone check is logged with its
+  exact revision and test count in `RESULTS_LOG.md`.
 - **Calibration study:** `python -m alphalab.backtest.calibration {diff|es}` (about 1.3 hours
   on 4 cores) regenerates §6.1 from its seed.
 - **Exploration:** a read-only Streamlit dashboard (`make dashboard`) shows the saved results

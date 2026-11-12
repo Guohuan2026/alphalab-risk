@@ -204,3 +204,18 @@ category D wording); P2/P3 inference only provisional by endpoint checks; correl
 counts; "meaningfully better" undefined; episode variance quadrupled, not doubled; P1 target
 dates. Spot checks of DQ, CC counts, lockbox and NOT REPLICATED: OK; ESR framing OK.
 **Action:** all applied in REPORT, EVIDENCE_STATUS and README before publishing.
+
+## 2026-11-12 — Milestone 18 (owner-approved): release preparation and final review
+
+Clean-clone re-check, audit, README, DATA.md, CHANGELOG, proposed release notes, report PDF
+(generated outside the repository; binary files are outside the publish workflow), dashboard
+evidence captions. **Codex final review (m-b6a4b184349e / m-a2eb537cd8e4):** MAJOR: README
+and report abstract said the design was frozen "before any model result", contradicting the
+logged HS/EWMA baseline exception. MINORs: hybrid calm-advantage wording too absolute; CC
+"everywhere" needed scoping; verification claims outran the record (339 tests "in a fresh
+clone" not yet run); `make synthetic` scope; PDF export could succeed silently without
+rendering; DATA.md promised private snapshot sharing categorically; plain-language VaR/ES
+definition; newest lockbox screenshot. **Action:** all applied (render-completion check with
+tests; claims narrowed; screenshot retaken). **Public release: NO-GO** until the owner
+decides on the privacy items (author email in commit metadata; tracked internal workflow
+notes) and the final-tree fresh-clone check is logged.
