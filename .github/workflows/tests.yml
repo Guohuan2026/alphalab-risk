@@ -8,12 +8,18 @@ on:
   push:
   pull_request:
 
+# Least privilege: the job only reads the repository. No write scopes, no secrets.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # do not leave the token in .git/config
 
       - name: Install uv and Python 3.12
         uses: astral-sh/setup-uv@v6
