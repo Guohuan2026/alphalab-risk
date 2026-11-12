@@ -125,5 +125,5 @@ recommendation requested from Codex (Agent HUD message m-b5125423b0e5, 19:42).
 new amendment retiring ESR inference to descriptive status, keeping descriptive results, with
 the other backtests calibrated for dependence separately. **Action:** recorded as the
 recommendation to the owner in RUN_SUMMARY.md; not implemented (design change → owner).
-Run stopped at 19:45 EST, before the 20:16 hard stop: no remaining step is permitted without
+Run stopped at 19:42 EST, before the 20:16 hard stop: no remaining step is permitted without
 the owner (design change, real-data launch, push, merge).
