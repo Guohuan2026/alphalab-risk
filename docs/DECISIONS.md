@@ -114,3 +114,16 @@ choose, log, and continue. Owner's standing limits from the amendment-10 approva
 no real-data bootstrap launch, no --no-verify, no estimator changes to obtain a pass.
 **Plan:** wait for the V2/V1 simulations (running since 18:08), apply the frozen gate
 (amendment 10(f), 10(j)), report GO/NO-GO; if GO, estimate the real-data cost only.
+
+## 2026-11-11 19:40 EST — amendment 10 gate applied (no discretion involved)
+
+Frozen rule (10(f), 10(j)) applied mechanically: V2 NO-GO for strict and intercept (block 20:
+strict B1 11.7%, B2 25.4%; intercept B1 8.5%, B2 16.6% > 6.4%); V1 unusable (10–44% failed
+full-sample fits). Per 10(g): estimator work stopped, nothing launched. Next-milestone
+recommendation requested from Codex (Agent HUD message m-b5125423b0e5, 19:42).
+**Codex (19:42, Agent HUD):** agrees NO-GO for both tests; recommends as the next milestone a
+new amendment retiring ESR inference to descriptive status, keeping descriptive results, with
+the other backtests calibrated for dependence separately. **Action:** recorded as the
+recommendation to the owner in RUN_SUMMARY.md; not implemented (design change → owner).
+Run stopped at 19:45 EST, before the 20:16 hard stop: no remaining step is permitted without
+the owner (design change, real-data launch, push, merge).

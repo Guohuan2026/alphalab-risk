@@ -716,3 +716,14 @@ Format: date · section · change · reason · made before/after seeing affected
      Applied identically to every variant, so the earlier scl_sp result read with this rule
      is also unusable in design A (69 of 1,000 full samples degenerate); its saved file is
      kept as written.
+     (k) *Result (2026-11-11 19:40 EST; gate applied as frozen):* both runs complete
+     (R = 1,000, paired). **V2: NO-GO for both tests.** Zero full-sample and zero draw
+     failures. 5% rejection at block 20 (Wilson 95%): strict A 5.6% [4.3, 7.2], B1 11.7%
+     [9.9, 13.8], B2 25.4% [22.8, 28.2]; intercept A 3.5% [2.5, 4.8], B1 8.5% [6.9, 10.4],
+     B2 16.6% [14.4, 19.0]. It fails in B1, not only B2, so not even the restricted GO
+     applies. Blocks 10/40: strict B1 15.3/10.1%, B2 36.8/19.8%; intercept B1 8.6/5.5%,
+     B2 18.4/14.5%; the iid bootstrap is worst (strict B1 24.5%, B2 44.7%). Longer blocks
+     help monotonically but no block tested reaches the threshold in B2, so the bootstrap
+     only partly accounts for the serial dependence. Asymptotic p-values: NO-GO (strict A
+     11.0%, B1 38.3%, B2 58.6%). **V1: unusable** (full-sample fit failures A 98, B1 409, B2
+     437 of 1,000). Per (g), work on the estimator stopped; ESR p-values remain descriptive.
