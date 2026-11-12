@@ -1,7 +1,6 @@
-# AlphaLab-Risk v1.0 (proposed release notes)
+# AlphaLab-Risk v1.0.0
 
-*Prepared for the owner's approval. Not tagged, not published; the repository is private.
-Package version 1.0.0; MIT License.*
+*Released 2026-11-12. Package version 1.0.0; MIT License.*
 
 AlphaLab-Risk compares eleven econometric and machine-learning models for one-day portfolio
 Value-at-Risk and Expected Shortfall on three portfolios (SPY, a 60/40 ETF portfolio and

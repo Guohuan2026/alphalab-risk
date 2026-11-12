@@ -232,3 +232,13 @@ is consistent with the README's AI-assistance disclosure, so it is kept unchange
 superseded. Because these files are outside the automated publish workflow (root files,
 binaries, `pyproject.toml`), the owner commits them. Merge to main, the release tag and the
 visibility change still await the owner's explicit approval.
+
+## 2026-11-12 — Owner approval of the v1.0.0 public release
+
+The owner approved: finalising the changelog and release notes; a pull request from
+`alphalab-risk` into `main` merged with a merge commit after CI passes; a draft v1.0.0 GitHub
+release with the report PDF; making the repository public after a final audit; `main` as the
+default branch with protection (pull requests and passing CI required, no force-pushes or
+deletion); a backup tag for the unpushed local commit `251d525` before resetting local `main`;
+keeping `esr-robust-start`; and least-privilege CI permissions. No history rewrite, hook
+bypass, force-push, deletion of research records, lockbox change or live download.
