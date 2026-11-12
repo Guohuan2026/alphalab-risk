@@ -70,6 +70,9 @@ the **minimum viable study** is P1 (SPY), h = 1 day, VaR 1%/5%, ES 2.5%.
     figures generated from saved results; a methods appendix on the ESR negative result
     (esreg port, the degenerate-start defect, the size failure under dependence); limitations
     and reproducibility sections; supervisor-ready PDF.
+    **Done 2026-11-12 (draft v2):** every claim labelled and re-checked against saved results;
+    figures as Mermaid charts (matplotlib is not installed and image files are outside the
+    publish workflow); PDF export left for milestone 18.
 18. **Portfolio release:** README rewritten for a recruiter reader (question, answer, one
     figure, architecture, how to reproduce, CI badge); dashboard "evidence status" labels
     next to every p-value; clean-clone run; tagged release `v1.0`; owner decides on

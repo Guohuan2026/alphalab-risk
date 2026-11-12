@@ -20,7 +20,7 @@ unsupported; no method was modified after the results were seen.
 | **A. Supported inference** | Size within the frozen tolerance in every gated design for that sample length and α (simulated dependence envelope; Addition 10). | "rejected / not rejected at 5%", with any caveat listed |
 | **B. Descriptive** | Estimates, rankings and diagnostics; correct as measurements, no sampling-error claim. Includes the statistics of tests classified unsupported. | "higher / lower", "ranked first", never "significantly" |
 | **C. Pending** | Not yet checked. | *(no test is now in this category)* |
-| **D. Unsupported / retired** | The test failed its size check (Milestone 16) or its validation (ESR). | Statistic as a diagnostic only; no p-value, significance or GO/NO-GO |
+| **D. Unsupported / retired** | The test failed its size check (Milestone 16) or its validation (ESR). | Statistic as a diagnostic only; no significance or GO/NO-GO. A p-value may be quoted only to document an earlier claim, never as evidence |
 
 ## Calibration results (Milestone 16; R = 2,000, seed 20261112; nominal 5%, limit 6.4%; MCS 90%, limit 11.9%)
 
@@ -66,8 +66,11 @@ Reading the table:
   statistics, including a median-matched one; they do not establish the same distortion
   in the actual series.
 - **Coverage and DQ**: rates are for correct forecasts (designs A and C). In the
-  missed-volatility designs B1/B2 these tests reject 17–100%, which is correct power, not
-  size distortion: clustered hits are their alternative.
+  missed-volatility designs B1/B2, IND, CC and DQ reject 17–100%, which is power: clustered
+  hits are their alternative. **POF is different**: its null (correct overall breach rate)
+  can still hold in B1/B2, so its 27–67% rejection there is size distortion under clustered
+  breaches. POF is supported only where breaches are close to independent; CC is the primary
+  coverage test.
 - **Sparse hits (T = 961, α = 1%, ≈ 10 expected hits)**: POF rejects every sample with 0–4
   hits by construction; CC (3.6%) and IND (1.2%) are conservative; McNeil–Frey gives no result in up to a
   third of samples; DQ over-rejects (11%).
@@ -76,12 +79,12 @@ Reading the table:
 
 | Test (code) | Used for | Category | What may be said |
 |---|---|---|---|
-| Christoffersen CC (`coverage.py`) | H1 | **A** | Reject / not reject at 5%, development and lockbox, every α. |
+| Christoffersen CC (`coverage.py`) | H1 | **A** | Reject / not reject at 5%, development and lockbox, every α. P2/P3 lengths lie between the simulated ones: provisionally supported by endpoint checks. |
 | Christoffersen IND | H1 | **A** (D at T = 961, α 5%) | As CC; lockbox 5% IND p-values descriptive. |
 | Kupiec POF | H1 | **A** (D at T = 961, α 1%) | Lockbox 1% POF is over-sized (discreteness). A *non-rejection* there remains informative; a rejection would not be. |
 | DQ (`coverage.py`; development only) | H1 supplementary | **A** at 5% and at 2.5% on T = 6,535; **D** at 1% | 1% DQ p-values descriptive. A Monte Carlo DQ (rebuilding lagged-hit regressors each draw) would be needed to restore them. |
 | Basel traffic light | Description | **B** | A counting rule, not a test. |
-| McNeil–Frey (`es.py`) | ES adequacy | **D** in most cells | p-values descriptive except raw at T = 6,535 α 1% and T = 961 α 5%; the **severity ratio** stays **B**. |
+| McNeil–Frey (`es.py`) | ES adequacy | **D** in most cells | p-values descriptive except three supported cells: raw and standardised at T = 6,535 α 1%, raw at T = 961 α 5%; the **severity ratio** stays **B**. |
 | Acerbi–Székely Z2 (`es.py`; development only) | ES adequacy | **D** | Over-rejects whenever volatility dynamics are misspecified, even with correct conditional tails assumed; the **Z2 statistic** stays **B**. |
 | Diebold–Mariano (`compare.py`) | H2a, H2b | **D** | Mean loss differences are **B**; "significantly better/worse" is not supported, in development or lockbox. |
 | Model Confidence Set (`compare.py`) | H2a headline | **D** | Membership is descriptive; the procedure excludes equally good models far too often under realistic dependence, so exclusion is not evidence of inferiority. |
@@ -94,13 +97,13 @@ Reading the table:
 
 | Finding (REPORT.md) | Rests on | Status after calibration |
 |---|---|---|
-| FHS-GJR is the best-calibrated model: passes Kupiec and Christoffersen in every development cell; in the lockbox its conditional coverage is not rejected (P1 CC p = 0.89 / 0.37 / 0.63) | CC (A), POF/IND mostly A; hit rates (B) | **Restated:** FHS-GJR's VaR conditional-coverage null is not rejected; CC meets the simulated size criterion, with sparse-hit power limitations (≈ 10 expected hits at 1% in the lockbox). This does not confirm correct calibration, ES adequacy, or superiority over other models; "best-calibrated" is a descriptive summary (it is the only model never rejected), not a test result. |
+| FHS-GJR is the best-calibrated model (draft v1). Checked against saved results 2026-11-12: its CC null is not rejected in 11 of 12 development cells (rejected on P2 at 1%, p = 0.027); on P1 it is the only model never rejected by Kupiec or Christoffersen; in the lockbox its CC null is not rejected in 9 of 9 cells, as for four other models (P1 CC p = 0.89 / 0.37 / 0.63) | CC (A), POF/IND mostly A; hit rates (B) | **Restated:** FHS-GJR's VaR conditional-coverage null is not rejected; CC meets the simulated size criterion, with sparse-hit power limitations (≈ 10 expected hits at 1% in the lockbox). This does not confirm correct calibration, ES adequacy, or superiority over other models; "best-calibrated" is a descriptive summary (fewest rejections: 1 of 12 development cells; on P1 the only model never rejected), not a test result. |
 | ML models fail coverage (H1 not supported for ML) | CC/POF (A) | **Stands** (development cells; T = 6,535 is calibrated at every α). |
 | DQ rejects every model, including FHS-GJR on P1 (p = 0.019, 0.002, 0.011) | DQ | **Restated per portfolio:** at 5% DQ rejects all 11 models on P1 and P2 and 10 of 11 on P3 (FHS-GJR not rejected, p = 0.43), checked against the saved `backtest_dq.csv`. P1 (T = 6,535) is calibrated at 2.5% and 5%, so FHS-GJR's P1 rejections there (p = 0.002, 0.011) stand. P2/P3 (T = 4,142 / 4,838) lie between the simulated lengths: 5% passed at both, 2.5% only at T = 6,535. All 1% rejections are descriptive. |
 | Ranking by mean FZ0; "ML does not beat FHS-GJR" (development); lockbox reversal | Mean losses, ranks (B) | **Descriptive facts.** "Lower average loss" is safe; every "significantly" from DM is withdrawn. |
 | DM significance (FHS-GJR beats QRF and GBQ; control vs FHS-GJR at 2.5% in the lockbox, p = 0.037; P2 hybrid p = 0.011) and MCS membership | DM, MCS (D) | **Withdrawn as inference**; reported as descriptive. |
 | Pre-stated lockbox rule "NOT REPLICATED" | Mean-FZ0 ordering (B) and MCS membership (D) | **Unchanged**: the rule fails on its descriptive half (GBQ has lower mean FZ0 in all three portfolios), whatever the MCS does. |
-| H3: ML better in calm, worse in crises (HAC p ≤ 0.015) | HAC regression (D); breach rates by regime (B) | **Direction descriptive only**; significance withdrawn. The consistency of sign across 12 robustness cells is descriptive support, not a test. |
+| H3: ML better in calm, worse in crises (HAC p ≤ 0.015) | HAC regression (D); breach rates by regime (B) | **Restated (draft v2):** every ML model's loss relative to FHS-GJR worsens in crisis episodes in all 36 model × setting × level cells (correlated; descriptive consistency, not a test); a calm-period advantage holds only for the RF-vol hybrid (P1, P2, rolling; ≈ 0 on P3), not for the quantile forest or gradient boosting. Significance withdrawn. |
 | H4: drivers unstable across refits | SHAP/permutation (B) | Descriptive. |
 | ESR results | ESR (D) | Diagnostics only. |
 
@@ -108,7 +111,7 @@ Reading the table:
 
 - **Held-out vs exploratory.** Only the pre-registered tests run once on the lockbox
   (coverage, McNeil–Frey, FZ0, DM, MCS; 2026-11-07) are held-out evidence; of those, only
-  CC, IND (1%, 2.5%) and POF (2.5%, 5%) now carry supported inference at lockbox length.
+  CC, IND (1%, 2.5%), POF (2.5%, 5%; independent breaches) and raw McNeil–Frey at 5% now carry supported inference at lockbox length.
   DQ, Z2, ESR, the horizon table, Addition 9 and the Milestone 16 calibration were added
   after the lockbox was opened: exploratory. The calibration used simulated data and the
   development stress calendar only; the lockbox was not accessed.

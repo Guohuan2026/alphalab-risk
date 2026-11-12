@@ -190,3 +190,17 @@ distortion; the MCS sanity runs are post-hoc diagnostics; explain that SUPPORTED
 size-only and marginal per test; verify each asserted DQ rejection. **Action:** all applied in
 EVIDENCE_STATUS and RESULTS_LOG. The DQ check against saved results showed FHS-GJR is *not*
 rejected on P3 at 2.5% or 5%, so "DQ rejects every model" is restated per portfolio.
+
+## 2026-11-12 — Milestone 17 (owner-approved): report draft v2 and independent review
+
+Report rewritten with evidence labels; every number re-checked against saved results, which
+found four imprecise earlier statements (logged in RESULTS_LOG). **Codex review
+(m-85c9fec3c1b5 / m-793ca1fcd76f):** two MAJORs: (1) the calm-period advantage holds only for
+the RF-vol hybrid; the quantile forest and gradient boosting are worse than FHS-GJR in calm
+periods too (verified: positive calm difference in 23 of their 24 cells); (2) causal
+mechanisms and "correct on average" were stated categorically. MINORs: EVIDENCE_STATUS
+inconsistencies (POF in B1/B2 is size distortion, not power; McNeil–Frey supported-cell lists;
+category D wording); P2/P3 inference only provisional by endpoint checks; correlated sign
+counts; "meaningfully better" undefined; episode variance quadrupled, not doubled; P1 target
+dates. Spot checks of DQ, CC counts, lockbox and NOT REPLICATED: OK; ESR framing OK.
+**Action:** all applied in REPORT, EVIDENCE_STATUS and README before publishing.

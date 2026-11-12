@@ -774,3 +774,15 @@ commit `b47c95e`). R = 2,000, seed 20261112, T = 6,535 and 961, 4 low-priority c
   rejections are descriptive; the lockbox "NOT REPLICATED" verdict is unchanged
   (it fails on mean-FZ0 ordering alone). Codex post-run review: classifications match the
   frozen rules.
+
+---
+
+## 2026-11-12 — Research report draft v2 (Milestone 17; no new results)
+
+`docs/REPORT.md` rewritten with the Milestone 16 evidence labels. Every number was re-checked
+against the saved result files. Corrections found by that check (no result changed; earlier
+summaries were imprecise): FHS-GJR's conditional-coverage null **is rejected on P2 at 1%**
+(p = 0.027), so it is not rejected in 11 of 12 development cells, not "every cell"; DQ does
+**not** reject FHS-GJR on P3 at any level; the RF-vol hybrid's day-after VaR rise is 38%, not
+in the 23–29% range of the other tree models; in the lockbox, FHS-GJR, gradient boosting,
+the RF-vol hybrid, the lasso control and HAR-FHS all have 0 of 9 CC rejections.

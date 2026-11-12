@@ -36,17 +36,18 @@ About. It never fits a model: what it shows is exactly what the results log reco
 
 **Status: Risk week 2 — design frozen (`prereg-v1`); HS, EWMA, GARCH-t, GJR-GARCH-t and FHS
 backtested on SPY 1997–2022 (see [docs/RESULTS_LOG.md](docs/RESULTS_LOG.md)).** All 11 models
-backtested on SPY 1997–2022: no ML model beats FHS-GJR; the RF-volatility + FHS hybrid ties
-with it; direct-quantile ML (QRF, boosting) is worse even than the linear control in the
-deep tail. Stress analysis (H3): FHS-GJR alone stays calibrated in crises; the ML hybrid
-is better in calm markets but worse in stress. Interpretability (H4): ML relies on VIX and
-range volatility, but signs and rankings are unstable, and trees saturate beyond their training
-range (2008). Robustness (P2 60/40, P3 Canada, rolling window): FHS-GJR first in 11 of 12
-cells; ML always loses ground in stress. **Lockbox 2023–26 (opened once): not replicated.**
-In that calm period feature-based models had lower average loss (not significant on SPY),
-while FHS-GJR stayed calibrated. Conclusion: regime-dependent, with FHS-GJR the robust
-choice. A fresh clone from GitHub
-reproduces P1 bit-for-bit (locked environment, `requirements-lock.txt`). Research report: draft v1. The Python package and CLI are still called `alphalab`.
+backtested on three portfolios (summary from report draft v2; evidence labels in
+[docs/EVIDENCE_STATUS.md](docs/EVIDENCE_STATUS.md)). Calibration (supported inference): the ML
+models' VaR forecasts fail Christoffersen's conditional-coverage test in 11–12 of 12
+development cells, while FHS-GJR's conditional-coverage null is not rejected in 11 of 12.
+Descriptive comparisons: no ML model has meaningfully lower average FZ0 loss than FHS-GJR in
+development; ML loses ground relative to FHS-GJR in every crisis-episode cell; tree models
+saturate beyond their training range (2008). **Lockbox 2023–26 (opened once): not
+replicated** by the pre-stated rule (gradient boosting had lower mean FZ0 in every
+portfolio). A frozen calibration study found the Diebold–Mariano, MCS and stress-regression
+tests badly over-sized on these data, so comparative findings are descriptive, not
+significant. A fresh clone from GitHub
+reproduces P1 bit-for-bit (locked environment, `requirements-lock.txt`). Research report: draft v2. The Python package and CLI are still called `alphalab`.
 
 *History:* the project began as an equity stock-selection platform (AlphaLab). Its data,
 returns, calendar and look-ahead infrastructure are reused unchanged. The pre-pivot state is
