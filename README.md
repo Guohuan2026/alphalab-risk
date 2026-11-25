@@ -9,7 +9,7 @@ with a pre-registered design, a once-only held-out test and calibrated backtests
 *Value-at-Risk (VaR)* is the loss a portfolio should exceed only on a given small share of days
 (for example 1 day in 100); *Expected Shortfall (ES)* is the average loss on those bad days.
 
-MSc Finance research project (HEC Montréal, supervised-project pathway) by Guohuan Yu.
+Independent research project by Guohuan Yu, MSc Finance student at HEC Montréal
 **Research report: [docs/REPORT.md](docs/REPORT.md)** (draft v2; PDF:
 [docs/AlphaLab-Risk_Report.pdf](docs/AlphaLab-Risk_Report.pdf)).
 
